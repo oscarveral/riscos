@@ -107,4 +107,5 @@ struct proc {
 
   // -- DEISO --
   int tickets;                 // Number of tickets
+  int ticks;
 };

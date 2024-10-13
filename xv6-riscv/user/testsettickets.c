@@ -55,7 +55,7 @@ int main(int argc, char *argv[]){
       }
     }
     struct pstat info;
-    getpinfo(&info);
+    getpinfo(&info); //Se pasa la dirección de pstat en el espacio de usuario
     for(int i=0; i<NPROC; i++){
       if(info.inuse[i] == 1){
         printf("pid: %d; tickets: %d; ticks: %d;\n", info.pid[i], info.tickets[i], info.ticks[i]);

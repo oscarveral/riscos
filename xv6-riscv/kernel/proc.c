@@ -8,6 +8,11 @@
 
 // -- DEISO --
 #include "pstat.h"
+#define MODULO 424967296
+#define MULTIPLICADOR 1664525
+#define INCREMENTO 1013904223
+#define SEMILLA 123456789
+
 struct pstat pstat;
 
 struct cpu cpus[NCPU];
@@ -152,10 +157,7 @@ found:
 
   // -- DEISO --
   p->tickets = 1;
-  pstat.inuse[p - proc] = 1;
-  pstat.tickets[p - proc] = 1;
-  pstat.pid[p - proc] = p->pid;
-  pstat.ticks[p - proc] = 0;
+  p->ticks = 0;
 
   return p;
 }
@@ -183,10 +185,6 @@ freeproc(struct proc *p)
 
   // -- DEISO --
   p->tickets = 0;
-  pstat.inuse[p - proc] = 0;
-  pstat.tickets[p - proc] = 0;
-  pstat.pid[p - proc] = 0;
-  pstat.ticks[p - proc] = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -343,9 +341,6 @@ fork(void)
   acquire(&np->lock);
   np->state = RUNNABLE;
 
-  // -- DEISO --
-  pstat.tickets[np - proc] = np->tickets;
-
   release(&np->lock);
 
   return pid;
@@ -460,15 +455,6 @@ wait(uint64 addr)
   }
 }
 
-#define LOTTERY
-#ifndef LOTTERY
-// Per-CPU process scheduler.
-// Each CPU calls scheduler() after setting itself up.
-// Scheduler never returns.  It loops, doing:
-//  - choose a process to run.
-//  - swtch to start running that process.
-//  - eventually that process transfers control
-//    via swtch back to the scheduler.
 void
 scheduler(void)
 {
@@ -483,47 +469,8 @@ scheduler(void)
     intr_on();
 
     int found = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
-      }
-      release(&p->lock);
-    }
-    if(found == 0) {
-      // nothing to run; stop running on this core until an interrupt.
-      intr_on();
-      asm volatile("wfi");
-    }
-  }
-}
-
-#else
-
-void
-scheduler(void)
-{
-  struct proc *p;
-  struct cpu *c = mycpu();
-
-  c->proc = 0;
-  for(;;){
-    // The most recent process to run may have had interrupts
-    // turned off; enable them to avoid a deadlock if all
-    // processes are waiting.
-    intr_on();
-
-    int found = 0;
+    // -- DEISO --
     int total_tickets = 0;
     
     for (p = proc; p < &proc[NPROC]; p++){
@@ -534,23 +481,27 @@ scheduler(void)
       release(&p->lock);
     }
 
-    int gen_tickets = 0;
-/*    for (int i = 0; i < total_tickets; i++) {
-      gen_tickets = (gen_tickets*1664525+1013904223) % total_tickets;
-    }*/
+    int rand_seed = SEMILLA;
+    rand_seed = (rand_seed * MULTIPLICADOR + INCREMENTO) % MODULO;
+    
+    int winning_ticket = rand_seed % total_tickets;
+    int suma_tickets = 0;
 
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      if(p->state == RUNNABLE && (gen_tickets -= p->tickets) <= 0) {
-       
-        pstat.ticks[p - proc]++;
+      //if(p->state == RUNNABLE && (winning_ticket -= p->tickets) <= 0) {
+      if(p->state == RUNNABLE) {
+        suma_tickets += p->tickets;
+        if(suma_tickets > winning_ticket) {
+          p->ticks++;
 
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
+          p->state = RUNNING;
+          c->proc = p;
+          swtch(&c->context, &p->context);
 
-        c->proc = 0;
-        found = 1;
+          c->proc = 0;
+          found = 1;
+        }
       }
       release(&p->lock);
     }
@@ -561,8 +512,6 @@ scheduler(void)
     }
   }
 }
-
-#endif
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores
@@ -750,14 +699,15 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
 
 // -- DEISO --
 int
-getpinfo(struct pstat *addr) {
-  for (int i = 0; i < NPROC; i++)
-  {
-    addr->inuse[i] = pstat.inuse[i];
-    addr->tickets[i] = pstat.tickets[i];
-    addr->pid[i] = pstat.pid[i];
-    addr->ticks[i] = pstat.ticks[i];
-  }
+getpinfo(struct pstat *addr) 
+{
+  for(int i = 0; i < NPROC; i++){
+    addr->inuse[i] = (proc[i].state != UNUSED);
+    addr->pid[i] = proc[i].pid;
+    addr->tickets[i] = proc[i].tickets;
+    addr->ticks[i] = proc[i].ticks;
+  } 
+
   return 0;
 }
 
