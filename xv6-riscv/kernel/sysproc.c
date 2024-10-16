@@ -112,10 +112,16 @@ sys_settickets(void)
 uint64 
 sys_getpinfo(void)
 {
-  struct pstat pstat;
-  argaddr(0, (uint64 *)&pstat);
-
-  if (&pstat <= 0)
+  struct pstat pstat; //En kernel
+  uint64 upstat; //Dirección del pstat que se ha pasado. En usuario
+  argaddr(0, &upstat); 
+  if (&upstat <= 0)
     return -1;
-  return getpinfo(&pstat);
+
+  getpinfo(&pstat); //Se ha rellenado pstat con los datos en el kernel
+
+  if(copyout(myproc()->pagetable, upstat, (char *)&pstat,sizeof(pstat)) < 0) // Copiamos la pstat desde el kernel al espacio de usuario
+      return -1;
+
+  return 0;
 }
