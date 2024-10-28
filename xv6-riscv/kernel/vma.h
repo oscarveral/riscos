@@ -1,3 +1,6 @@
+#ifndef VMA_H
+#define VMA_H
+
 #define MAX_VMAS 16
 
 struct VMA{
@@ -11,3 +14,5 @@ struct VMA{
     unsigned int long offset;
     struct VMA *vma_next;
 };
+
+#endif

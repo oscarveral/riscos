@@ -515,7 +515,7 @@ sys_mmap(void)
   argint(3, &flags);
   argint(4, &fd);
 
-  if((prot != PROT_READ) && (prot != PROT_WRITE) && (prot !=PROT_READ_WRITE)){
+  if((prot != PROT_READ) && (prot != PROT_WRITE) && (prot != (PROT_READ | PROT_WRITE))){
     return -1;
   }
 
@@ -527,5 +527,5 @@ sys_mmap(void)
     return -1;
   }
 
-  return mmap(0, length, prot, flags, fd, 0);
+  return mmap(length, prot, flags, fd);
 }

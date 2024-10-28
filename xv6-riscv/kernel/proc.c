@@ -159,6 +159,11 @@ found:
   p->tickets = 1;
   p->ticks = 0;
 
+  for (int i = 0; i < MAX_VMAS; i++) {
+    p->vmas[i].used = 0;
+  }
+  p->vma_first = 0;
+
   return p;
 }
 
@@ -185,6 +190,9 @@ freeproc(struct proc *p)
 
   // -- DEISO --
   p->tickets = 0;
+  p->ticks = 0;
+
+  // TODO. LIBERAR VMAS.
 }
 
 // Create a user page table for a given process, with no user memory,

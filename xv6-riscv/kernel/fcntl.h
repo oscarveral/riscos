@@ -7,7 +7,6 @@
 // --DEISO--
 #define PROT_READ 0X1
 #define PROT_WRITE 0X2
-#define PROT_READ_WRITE (0x1 | 0x2)
 
 #define MAP_SHARED 0X01
 #define MAP_PRIVATE 0X02

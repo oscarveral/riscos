@@ -110,6 +110,7 @@ struct proc {
   int tickets;                 // Number of tickets
   int ticks;
 
+  struct VMA *vma_first;
   struct VMA vmas[MAX_VMAS];
   // nextvmaadress; esto da problemas q no hay q resolver
 
