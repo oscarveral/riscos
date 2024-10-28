@@ -49,7 +49,7 @@ usertrap(void)
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
+
   if(r_scause() == 8){
     // system call
 
@@ -67,6 +67,10 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+    // --DEISO--
+  } else if((r_scause() == 13) || (r_scause() == 15)){ //Load page fault or store/AMO page fault
+
+  //rellenar
   } else {
     printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
     printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());
@@ -138,6 +142,10 @@ kerneltrap()
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
+
+  //comprobar si estoy en mitad de una llamada al sistema
+  //hacer la comprobación para q no se haga fallo depagina en el kernel
+  //o si se hace, manejarla: dejar q se produzca y tratarlo aquí
   
   if((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");

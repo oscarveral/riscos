@@ -111,6 +111,8 @@ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 
 // -- DEISO --
 int             getpinfo(struct pstat *addr); 
+void            *mmap(void *addr, uint64 length, int prot, int flags, int fd, int offset);
+int             munmap(void *addr, uint64 length);
 
 void            procdump(void);
 

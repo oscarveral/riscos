@@ -503,3 +503,29 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_mmap(void)
+{
+  uint64 length;
+  int prot, flags, fd;
+
+  argaddr(1, &length);
+  argint(2, &prot);
+  argint(3, &flags);
+  argint(4, &fd);
+
+  if((prot != PROT_READ) && (prot != PROT_WRITE) && (prot !=PROT_READ_WRITE)){
+    return -1;
+  }
+
+  if((flags != MAP_PRIVATE) && (flags != MAP_SHARED)){
+    return -1;
+  }
+
+  if(fd < 0 || fd >= NOFILE){
+    return -1;
+  }
+
+  return mmap(0, length, prot, flags, fd, 0);
+}

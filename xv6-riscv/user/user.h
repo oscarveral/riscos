@@ -30,6 +30,8 @@ int uptime(void);
 
 int settickets(int);
 int getpinfo(struct pstat*);
+void *mmap(void *addr, uint64 length, int prot, int flags, int fd, int offset);
+int munmap(void *addr, uint64 length);
 
 // ulib.c
 int stat(const char*, struct stat*);
