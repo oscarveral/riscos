@@ -6,14 +6,20 @@
 #include "proc.h"
 #include "defs.h"
 
-// -- DEISO --
+// + DEISO - P1
 #include "pstat.h"
+
 #define MODULO 424967296
 #define MULTIPLICADOR 1664525
 #define INCREMENTO 1013904223
 #define SEMILLA 123456789
 
 struct pstat pstat;
+// - DEISO - P1
+
+// + DEISO - P2
+#include "vma.h"
+// - DEISO - P2
 
 struct cpu cpus[NCPU];
 
@@ -155,14 +161,14 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
-  // -- DEISO --
+  // + DEISO - P1
   p->tickets = 1;
   p->ticks = 0;
+  // - DEISO - P1
 
-  for (int i = 0; i < MAX_VMAS; i++) {
-    p->vmas[i].used = 0;
-  }
-  p->vma_first = 0;
+  // + DEISO - P2
+  mm_init(&p->mm);
+  // - DEISO - P2
 
   return p;
 }
@@ -188,11 +194,14 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->state = UNUSED;
 
-  // -- DEISO --
+  // + DEISO - P1
   p->tickets = 0;
   p->ticks = 0;
+  // - DEISO - P1
 
-  // TODO. LIBERAR VMAS.
+  // + DEISO - P2
+  mm_destroy(&p->mm);
+  // - DEISO - P2
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -340,14 +349,21 @@ fork(void)
 
   acquire(&wait_lock);
   np->parent = p;
-
-  // -- DEISO --
-  np->tickets = p->tickets;
-  
   release(&wait_lock);
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+  // + DEISO - P1
+  acquire(&p->lock);
+  np->tickets = p->tickets;
+  release(&p->lock);
+  // - DEISO - P1
+
+  // + DEISO - P2
+  acquire(&p->lock);
+  mm_copy(&p->mm, &np->mm);
+  release(&p->lock);
+  // - DEISO - P2
 
   release(&np->lock);
 
@@ -463,6 +479,13 @@ wait(uint64 addr)
   }
 }
 
+// Per-CPU process scheduler.
+// Each CPU calls scheduler() after setting itself up.
+// Scheduler never returns.  It loops, doing:
+//  - choose a process to run.
+//  - swtch to start running that process.
+//  - eventually that process transfers control
+//    via swtch back to the scheduler.
 void
 scheduler(void)
 {
@@ -478,9 +501,8 @@ scheduler(void)
 
     int found = 0;
 
-    // -- DEISO --
+    // + DEISO - P1
     int total_tickets = 0;
-    
     for (p = proc; p < &proc[NPROC]; p++){
       acquire(&p->lock);
       if (p->state == RUNNABLE){
@@ -488,31 +510,27 @@ scheduler(void)
       }
       release(&p->lock);
     }
-
     int rand_seed = SEMILLA;
     rand_seed = (rand_seed * MULTIPLICADOR + INCREMENTO) % MODULO;
-    
     int winning_ticket = rand_seed % total_tickets;
     int suma_tickets = 0;
-
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
-      //if(p->state == RUNNABLE && (winning_ticket -= p->tickets) <= 0) {
       if(p->state == RUNNABLE) {
         suma_tickets += p->tickets;
         if(suma_tickets > winning_ticket) {
           p->ticks++;
-
           p->state = RUNNING;
           c->proc = p;
           swtch(&c->context, &p->context);
-
           c->proc = 0;
           found = 1;
         }
       }
       release(&p->lock);
     }
+    // - DEISO - P1
+
     if(found == 0) {
       // nothing to run; stop running on this core until an interrupt.
       intr_on();
@@ -705,7 +723,7 @@ either_copyin(void *dst, int user_src, uint64 src, uint64 len)
   }
 }
 
-// -- DEISO --
+// + DEISO - P1
 int
 getpinfo(struct pstat *addr) 
 {
@@ -718,6 +736,7 @@ getpinfo(struct pstat *addr)
 
   return 0;
 }
+// - DEISO - P1
 
 // Print a process listing to console.  For debugging.
 // Runs when user types ^P on console.

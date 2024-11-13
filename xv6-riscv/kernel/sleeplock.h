@@ -1,5 +1,5 @@
-#ifndef __SLEEPLOCK_H__
-#define __SLEEPLOCK_H__
+#ifndef _SLEEPLOCK_H_
+#define _SLEEPLOCK_H_
 
 // Long-term locks for processes
 struct sleeplock {
@@ -11,4 +11,4 @@ struct sleeplock {
   int pid;           // Process holding lock
 };
 
-#endif
+#endif // _SLEEPLOCK_H_

@@ -1,18 +1,28 @@
-#ifndef VMA_H
-#define VMA_H
+#ifndef _VMA_H_
+#define _VMA_H_
 
-#define MAX_VMAS 16
+// + DEISO - P2
 
-struct VMA{
-    int used; 
-    unsigned int length;
-    unsigned int long vma_start;
-    unsigned int long vma_end;
-    struct file *fp;
+#include "types.h"
+
+#define MAX_VMA 32
+
+struct vma
+{
+    uint64 start;
+    uint64 len;
+    struct file *file;
     int prot;
     int flags;
-    unsigned int long offset;
-    struct VMA *vma_next;
+    struct vma *next;
 };
 
-#endif
+struct mm
+{
+    struct vma *first_vma;
+    struct vma vmas[MAX_VMA];
+};
+
+// - DEISO - P2
+
+#endif // _VMA_H_

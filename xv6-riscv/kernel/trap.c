@@ -6,6 +6,11 @@
 #include "proc.h"
 #include "defs.h"
 
+// + DEISO - P2
+#include "file.h"
+#include "vma.h"
+// - DEISO - P2
+
 struct spinlock tickslock;
 uint ticks;
 
@@ -27,8 +32,6 @@ void trapinithart(void)
   w_stvec((uint64)kernelvec);
 }
 
-#include "fcntl.h"
-#include "file.h"
 //
 // handle an interrupt, exception, or system call from user space.
 // called from trampoline.S
@@ -49,9 +52,7 @@ void usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
 
-  uint64 cause = r_scause();
-//  printf("cause: %ld\n", cause);
-  if (cause == 8)
+  if (r_scause() == 8)
   {
     // system call
 
@@ -71,75 +72,50 @@ void usertrap(void)
   else if ((which_dev = devintr()) != 0)
   {
     // ok
-    // --DEISO--
   }
-  else if ((cause == 13) || (cause == 15))
-  { // Load page fault or store/AMO page fault
-
-    // TODO Recuperar dir fallo pagina.
-    uint64 dir_fallo = r_stval();
-    // TODO Comprobar si pertenece algun VMA
-    struct VMA *vma = myproc()->vma_first;
-    if (vma == 0)
+  else if (r_scause() == 13 || r_scause() == 15)
+  {
+    uint64 fail_addr = r_stval();
+    struct vma *mapping = find_vma(&p->mm, fail_addr);
+    if (mapping == (struct vma *)-1)
     {
+      printf("usertrap(): page fault pid=%d va=0x%lx\n", p->pid, fail_addr);
       setkilled(p);
-      goto killed;
     }
-    do
+    else
     {
-      if (dir_fallo < vma->vma_end || dir_fallo >= vma->vma_start)
+      uint64 *mem = kalloc();
+      if (mem == 0)
       {
-        break;
+        printf("usertrap(): out of memory pid=%d va=0x%lx\n", p->pid, fail_addr);
+        setkilled(p);
       }
-      vma = vma->vma_next;
-    } while (vma != 0);
-
-    if (vma == 0)
-    {
-      setkilled(p);
-      goto killed;
+      else
+      {
+        memset(mem, 0, PGSIZE);
+        uint64 user_mem = PGROUNDDOWN(fail_addr);
+        if (mappages(p->pagetable, user_mem, PGSIZE, (uint64)mem, mapping->prot | PTE_U | PTE_V) != 0)
+        {
+          printf("usertrap(): mappages failed pid=%d va=0x%lx\n", p->pid, fail_addr);
+          kfree(mem);
+          setkilled(p);
+        }
+        else
+        {
+          struct inode *ip = mapping->file->ip;
+          int offset = user_mem - mapping->start;
+          int n =(ip->size - offset) < PGSIZE ? (ip->size - offset) :  PGSIZE;
+          ilock(ip);
+          if(readi(ip, 0, (uint64)mem, offset, n) != n)
+          {
+            printf("usertrap(): readi failed pid=%d va=0x%lx\n", p->pid, fail_addr);
+            kfree(mem);
+            setkilled(p);
+          };
+          iunlock(ip);
+        }
+      }
     }
-
-    // Si no salir
-    // TODO Reservar pagina fisica.
-    uint64 *pa = kalloc();
-    if (pa == 0)
-    {
-      setkilled(p);
-      goto killed;
-    }
-    memset(pa, 0, PGSIZE);
-
-    // TODO Mapear pagina fisica
-    int va = PGROUNDDOWN(dir_fallo);
-    int prots = 0;
-    if (vma->prot & PROT_READ)
-      prots |= PTE_R ;
-    if (vma->prot & PROT_WRITE)
-      prots |= PTE_W;
-    prots |= PTE_U;
-    prots |= PTE_V;
-
-    if (mappages(p->pagetable, va, PGSIZE, (uint64)pa, prots))
-    {
-      kfree(pa);
-      setkilled(p);
-      goto killed;
-    }
-    // TODO Leer y cargar parte de fichero.
-    struct inode *ip = vma->fp->ip;
-    int offset = va - vma->vma_start;
-    int n =(ip->size - offset) < PGSIZE ? (ip->size - offset) :  PGSIZE;
-    ilock(ip);
-    if(readi(ip, 1, va, offset, n) != n)
-    {
-      kfree(pa);
-      setkilled(p);
-      goto killed;
-    };
-    iunlock(ip);
-
-    // rellenar
   }
   else
   {
@@ -148,7 +124,6 @@ void usertrap(void)
     setkilled(p);
   }
 
-killed:
   if (killed(p))
     exit(-1);
 
@@ -212,10 +187,6 @@ void kerneltrap()
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
-
-  // comprobar si estoy en mitad de una llamada al sistema
-  // hacer la comprobación para q no se haga fallo depagina en el kernel
-  // o si se hace, manejarla: dejar q se produzca y tratarlo aquí
 
   if ((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");

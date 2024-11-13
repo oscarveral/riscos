@@ -102,11 +102,15 @@ extern uint64 sys_link(void);
 extern uint64 sys_mkdir(void);
 extern uint64 sys_close(void);
 
-// -- DEISO --
+// + DEISO - P1
 extern uint64 sys_settickets(void);
 extern uint64 sys_getpinfo(void);
+// - DEISO - P1
+
+// + DEISO - P2
 extern uint64 sys_mmap(void);
 extern uint64 sys_munmap(void);
+// - DEISO - P2
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -133,11 +137,15 @@ static uint64 (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 
-// -- DEISO --
+// + DEISO - P1
 [SYS_settickets] sys_settickets,
 [SYS_getpinfo] sys_getpinfo,
+// - DEISO - P1
+
+// + DEISO - P2
 [SYS_mmap] sys_mmap,
-//[SYS_munmap] sys_munmap,
+[SYS_munmap] sys_munmap,
+// - DEISO - P2
 };
 
 void

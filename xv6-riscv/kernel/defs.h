@@ -1,3 +1,6 @@
+#ifndef _DEFS_H_
+#define _DEFS_H_
+
 struct buf;
 struct context;
 struct file;
@@ -9,8 +12,14 @@ struct sleeplock;
 struct stat;
 struct superblock;
 
-// -- DEISO --
+// + DEISO - P1
 struct pstat;
+// - DEISO - P1
+
+// + DEISO - P2
+struct vma;
+struct mm;
+// - DEISO - P2
 
 // bio.c
 void            binit(void);
@@ -108,13 +117,11 @@ void            wakeup(void*);
 void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
-
-// -- DEISO --
-int             getpinfo(struct pstat *addr); 
-int             mmap(uint64 length, int prot, int flags, int fd);
-int             munmap(void *addr, uint64 length);
-
 void            procdump(void);
+
+// + DEISO - P1
+int getpinfo(struct pstat *pstat);
+// - DEISO - P1
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -197,3 +204,12 @@ void            virtio_disk_intr(void);
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
+// + DEISO - P2
+void mm_init(struct mm *);
+uint64 *create_mapping(struct mm *, uint64, struct file *, int, int);
+struct vma *find_vma(struct mm *, uint64);
+void mm_destroy(struct mm *);
+void mm_copy(struct mm *, struct mm *);
+// - DEISO - P2
+
+#endif // _DEFS_H_

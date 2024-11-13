@@ -1,7 +1,8 @@
 struct stat;
 
-// -- DEISO --
+// + DEISO - P1
 struct pstat;
+// - DEISO - P1
 
 // system calls
 int fork(void);
@@ -26,12 +27,15 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 
-// -- DEISO --
-
+// + DEISO - P1
 int settickets(int);
 int getpinfo(struct pstat*);
+// - DEISO - P1
+
+// + DEISO - P2
 void *mmap(void *addr, uint64 length, int prot, int flags, int fd, int offset);
 int munmap(void *addr, uint64 length);
+// - DEISO - P2
 
 // ulib.c
 int stat(const char*, struct stat*);

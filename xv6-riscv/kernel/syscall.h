@@ -1,3 +1,6 @@
+#ifndef __SYSCALL_H__
+#define __SYSCALL_H__
+
 // System call numbers
 #define SYS_fork    1
 #define SYS_exit    2
@@ -21,9 +24,14 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 
-// -- DEISO --
-
+// + DEISO - P1
 #define SYS_settickets 22
 #define SYS_getpinfo 23
+// - DEISO - P1
+
+// + DEISO - P2
 #define SYS_mmap 24
 #define SYS_munmap 25
+// - DEISO - P2
+
+#endif // __SYSCALL_H__

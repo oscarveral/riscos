@@ -1,5 +1,4 @@
-// -- DEISO --
-
+// + DEISO - P1
 #ifndef _PSTAT_H_
 #define _PSTAT_H_
 
@@ -13,3 +12,4 @@ struct pstat {
 };
 
 #endif // _PSTAT_H_
+// - DEISO - P1

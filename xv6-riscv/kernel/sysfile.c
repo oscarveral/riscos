@@ -504,28 +504,54 @@ sys_pipe(void)
   return 0;
 }
 
-uint64
-sys_mmap(void)
-{
-  uint64 length;
-  int prot, flags, fd;
+// + DEISO - P2
 
-  argaddr(1, &length);
+#include "vma.h"
+
+uint64
+sys_mmap(void) 
+{
+  uint64 addr, len; 
+  int prot, flags, offset;
+  struct file *f;
+
+  argaddr(0, &addr);
+
+  // Addr is expected to be 0
+  if (addr != 0) {
+    return -1;
+  }
+
+  argaddr(1, &len);
   argint(2, &prot);
   argint(3, &flags);
-  argint(4, &fd);
 
-  if((prot != PROT_READ) && (prot != PROT_WRITE) && (prot != (PROT_READ | PROT_WRITE))){
+  if (argfd(4, 0, &f) < 0) {
     return -1;
   }
 
-  if((flags != MAP_PRIVATE) && (flags != MAP_SHARED)){
+  // Offset is expected to be 0.
+  argint(5, &offset);
+  if (offset < 0) {
     return -1;
   }
 
-  if(fd < 0 || fd >= NOFILE){
-    return -1;
-  }
-
-  return mmap(length, prot, flags, fd);
+  return (uint64)create_mapping(&myproc()->mm, len, f, prot, flags);  
 }
+
+uint64
+sys_munmap(void) 
+{
+  uint64 addr, len;
+
+  argaddr(0, &addr);
+  argaddr(1, &len);
+
+  if (len <= 0) {
+    return -1;
+  }
+
+  return -1;
+}
+
+// - DEISO - P2

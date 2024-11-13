@@ -6,8 +6,9 @@
 #include "spinlock.h"
 #include "proc.h"
 
-// -- DEISO --
+// + DEISO - P1
 #include "pstat.h"
+// - DEISO - P1
 
 uint64
 sys_exit(void)
@@ -95,8 +96,7 @@ sys_uptime(void)
   return xticks;
 }
 
-// -- DEISO --
-
+// + DEISO - P1
 uint64
 sys_settickets(void)
 {
@@ -125,3 +125,4 @@ sys_getpinfo(void)
 
   return 0;
 }
+// - DEISO - P1

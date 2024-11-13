@@ -37,9 +37,12 @@ entry("sbrk");
 entry("sleep");
 entry("uptime");
 
-# -- DEISO --
-
+# + DEISO - P1
 entry("settickets");
 entry("getpinfo");
+# - DEISO - P1
+
+# + DEISO - P2
 entry("mmap");
 entry("munmap");
+# - DEISO - P2

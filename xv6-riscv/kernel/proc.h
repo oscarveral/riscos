@@ -1,4 +1,10 @@
+#ifndef _PROC_H_
+#define _PROC_H_
+
+// + DEISO - P2
 #include "vma.h"
+// - DEISO - P2
+
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -106,57 +112,14 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  // -- DEISO --
+  // + DEISO - P1
   int tickets;                 // Number of tickets
-  int ticks;
+  int ticks;                   // Number of ticks
+  // - DEISO - P1
 
-  struct VMA *vma_first;
-  struct VMA vmas[MAX_VMAS];
-  // nextvmaadress; esto da problemas q no hay q resolver
-
-/*
-  MAX_VMASPERPROC 16 ó 8
-  struct VMA{
-  int used; =1
-  addr ó longitud(length) ¿donde mapeamos? varias maneras:
-  -a partir de una determinada dirección poner todas las vmas
-  -para aprovechar la reg de memoria, de arriba a abajo ->necesitamos ¿donde ponemos el siguiente
-  vma? coger las direcciones y ver donde está el próximo espacio libre
-  flags de protección (prot)
-  offset;
-  puntero al struct file(struct file *fp)
-  cosas
-  }
-  VMAS POR PROCESO
-  recorrer el array buscando una entrada libre y ponerla a usada a 1 y rellenar los campos de 
-  la vma
-
-  para munmap:
-  addr' nueva dir de comienzo si es por el final, si no se queda igual
-  y addr+length-1, se cambia la longitud para todos, y si es entero te cargas el vma
-  se liberan los recursos correspondientes. kfree() para los marcos de páginas
-
-  los traps de riscv es el codigo 13 en error de slectura y en escritura es 15
-  comprobar que la dirección está dentro del rango de direcciones de alguna vma
-
-  comprobar el número de referencias asociadas al fichero hay una función que decremtna las referncias
-  mirar el sys_dup y el sys_open para inspiración 
-
-  modificar la llamada al sistema fork porq hemos cambiado la estructura de procesos, 
-  el hiijo tiene q heredar la del padre las vmas
-
-
-  desde exit llamar tmb a munmap()
-
-
-  segunda parte:
-  vma0 se comparte. problema si es privativa y uno escribe: uno debe verla y el otro no.
-  copy-on-write: copia del contenido de la pg en otra. compartiendo datos hasta que uno escribe
-  cambiar exec para que en la parte de vma hacer que apunte a la del padre
-
-
-
-  utilizar mappages. uvmunmap mirar
-  poner continue en uvmumap: not mapped
-  */
+  // + DEISO - P2
+  struct mm mm;
+  // - DEISO - P2
 };
+
+#endif // _PROC_H_
