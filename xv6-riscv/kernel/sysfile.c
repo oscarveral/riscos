@@ -511,8 +511,8 @@ sys_pipe(void)
 uint64
 sys_mmap(void) 
 {
-  uint64 addr, len; 
-  int prot, flags, offset;
+  uint64 addr; 
+  int len, prot, flags, offset;
   struct file *f;
 
   argaddr(0, &addr);
@@ -522,7 +522,7 @@ sys_mmap(void)
     return -1;
   }
 
-  argaddr(1, &len);
+  argint(1, &len);
   argint(2, &prot);
   argint(3, &flags);
 
@@ -536,22 +536,36 @@ sys_mmap(void)
     return -1;
   }
 
-  return (uint64)create_mapping(&myproc()->mm, len, f, prot, flags);  
+  acquire(&myproc()->lock);
+  uint64 res = (uint64)create_mapping(myproc(), len, f, prot, flags);
+  release(&myproc()->lock);
+
+  return res;
 }
 
 uint64
 sys_munmap(void) 
 {
-  uint64 addr, len;
+  uint64 addr;
+  int len;
 
   argaddr(0, &addr);
-  argaddr(1, &len);
+  argint(1, &len);
 
   if (len <= 0) {
     return -1;
   }
 
-  return -1;
+  if (addr % PGSIZE != 0) {
+    return -1;
+  }
+
+  //printf("munmap: addr: %lx, len: %d\n", addr, len);
+  acquire(&myproc()->lock);
+  int res = delete_mapping(myproc(), addr, len);
+  release(&myproc()->lock);
+
+  return res;
 }
 
 // - DEISO - P2

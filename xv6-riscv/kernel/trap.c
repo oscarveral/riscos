@@ -76,45 +76,10 @@ void usertrap(void)
   else if (r_scause() == 13 || r_scause() == 15)
   {
     uint64 fail_addr = r_stval();
-    struct vma *mapping = find_vma(&p->mm, fail_addr);
-    if (mapping == (struct vma *)-1)
+    if (alloc_mapping(p, fail_addr) == -1)
     {
       printf("usertrap(): page fault pid=%d va=0x%lx\n", p->pid, fail_addr);
       setkilled(p);
-    }
-    else
-    {
-      uint64 *mem = kalloc();
-      if (mem == 0)
-      {
-        printf("usertrap(): out of memory pid=%d va=0x%lx\n", p->pid, fail_addr);
-        setkilled(p);
-      }
-      else
-      {
-        memset(mem, 0, PGSIZE);
-        uint64 user_mem = PGROUNDDOWN(fail_addr);
-        if (mappages(p->pagetable, user_mem, PGSIZE, (uint64)mem, mapping->prot | PTE_U | PTE_V) != 0)
-        {
-          printf("usertrap(): mappages failed pid=%d va=0x%lx\n", p->pid, fail_addr);
-          kfree(mem);
-          setkilled(p);
-        }
-        else
-        {
-          struct inode *ip = mapping->file->ip;
-          int offset = user_mem - mapping->start;
-          int n =(ip->size - offset) < PGSIZE ? (ip->size - offset) :  PGSIZE;
-          ilock(ip);
-          if(readi(ip, 0, (uint64)mem, offset, n) != n)
-          {
-            printf("usertrap(): readi failed pid=%d va=0x%lx\n", p->pid, fail_addr);
-            kfree(mem);
-            setkilled(p);
-          };
-          iunlock(ip);
-        }
-      }
     }
   }
   else

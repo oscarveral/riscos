@@ -1,6 +1,10 @@
 #ifndef _PROC_H_
 #define _PROC_H_
 
+#include "spinlock.h"
+#include "types.h"
+#include "param.h"
+
 // + DEISO - P2
 #include "vma.h"
 // - DEISO - P2

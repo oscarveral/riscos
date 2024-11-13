@@ -167,7 +167,7 @@ found:
   // - DEISO - P1
 
   // + DEISO - P2
-  mm_init(&p->mm);
+  mm_init(p);
   // - DEISO - P2
 
   return p;
@@ -200,7 +200,7 @@ freeproc(struct proc *p)
   // - DEISO - P1
 
   // + DEISO - P2
-  mm_destroy(&p->mm);
+  mm_destroy(p);
   // - DEISO - P2
 }
 

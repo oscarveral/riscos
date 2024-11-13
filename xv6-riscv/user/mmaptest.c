@@ -92,7 +92,7 @@ mmap_test(void)
   // file.
   //
   makefile(f);
-  if ((fd = open(f, O_RDONLY)) == -1)
+  if ((fd = open(f, O_RDWR )) == -1)
     err("open");
   //
   // this call to mmap() asks the kernel to map the content

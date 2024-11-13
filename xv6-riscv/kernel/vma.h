@@ -15,6 +15,7 @@ struct vma
     int prot;
     int flags;
     struct vma *next;
+    struct vma *prev;
 };
 
 struct mm
