@@ -75,6 +75,7 @@ void usertrap(void)
   }
   else if (r_scause() == 13 || r_scause() == 15)
   {
+    // TODO: Refactor this to put here all needed functions.
     uint64 fail_addr = r_stval();
     if (alloc_mapping(p, fail_addr) == -1)
     {

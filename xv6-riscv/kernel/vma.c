@@ -10,6 +10,11 @@
 
 uint64 *create_mapping(struct proc *p, uint64 len, struct file *f, int prot, int flags)
 {
+    if (prot & PROT_WRITE && flags & MAP_SHARED && f->writable == 0)
+    {
+        return (uint64 *)-1;
+    }
+
     struct mm *mm = &p->mm;
     struct vma *vma = 0;
     for (int i = 0; i < MAX_VMA; i++)
@@ -36,11 +41,6 @@ uint64 *create_mapping(struct proc *p, uint64 len, struct file *f, int prot, int
             cur = cur->next;
         }
         start = PGROUNDDOWN(cur->start - len);
-    }
-
-    if (prot & PROT_WRITE && f->writable == 0)
-    {
-        return (uint64 *)-1;
     }
 
     vma->start = start;
@@ -160,45 +160,22 @@ int delete_mapping(struct proc *p, uint64 addr, uint64 len)
 
 void dealloc_mapping(struct proc *p, uint64 addr, uint64 len, struct vma *vma)
 {
-    printf("AAAAA\n");
-    if (vma->prot & PROT_WRITE)
+    uint64 npages = PGROUNDUP(len) / PGSIZE;
+
+    if (vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable == 0) {
+        panic("dealloc_mapping: bad options");
+    }
+
+    if (vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0)
     {
         // Write back the page to the file
-    
-    uint64 start = PGROUNDDOWN(addr);
-    vma->file->off = start - vma->start;
+        //uint64 start = PGROUNDDOWN(addr);
 
-    // Get physical address of the page
-    uint64 pa = walkaddr(p->pagetable, start);
-    struct file * f= vma->file;
-    int n = len;
-    int r = 0;
-    f->off = start - vma->start;
-    int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
-    int i = 0;
-    while (i < n)
-    {
-        int n1 = n - i;
-        if (n1 > max)
-            n1 = max;
-
-        begin_op();
-        ilock(f->ip);
-        if ((r = writei(f->ip, 0, pa + i, f->off, n1)) > 0)
-            f->off += r;
-        iunlock(f->ip);
-        end_op();
-
-        if (r != n1)
-        {
-            // error from writei
-            break;
-        }
-        i += r;
+        // Get physical address of the page
+        //uint64 pa = walkaddr(p->pagetable, start);
     }
-    }
-    uint64 npages = PGROUNDUP(len) / PGSIZE;
-    uvmunmap(p->pagetable, addr, npages, 1);
+    // TODO: Refactor this to put in this file all needed functions.
+    uvmunmap_unchecked(p->pagetable, addr, npages, 1);
 }
 
 struct vma *find_vma(struct mm *mm, uint64 addr)
@@ -237,8 +214,8 @@ void mm_destroy(struct proc *p)
         if (mm->vmas[i].start != 0)
         {
             struct vma *vma = &mm->vmas[i];
-            fileclose(vma->file);
             dealloc_mapping(p, vma->start, vma->len, vma);
+            fileclose(vma->file);
             vma->start = 0;
             vma->len = 0;
             vma->file = 0;

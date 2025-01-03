@@ -179,6 +179,19 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  
+  // + DEISO - P1
+  p->tickets = 0;
+  p->ticks = 0;
+  // - DEISO - P1
+
+  // + DEISO - P2
+  // TODO: Refactor this into the function where it fails.
+  release(&p->lock);
+  mm_destroy(p);
+  acquire(&p->lock);
+  // - DEISO - P2
+
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
@@ -193,15 +206,6 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-
-  // + DEISO - P1
-  p->tickets = 0;
-  p->ticks = 0;
-  // - DEISO - P1
-
-  // + DEISO - P2
-  mm_destroy(p);
-  // - DEISO - P2
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -349,22 +353,16 @@ fork(void)
 
   acquire(&wait_lock);
   np->parent = p;
+  // + DEISO - P1
+  np->tickets = p->tickets;
+  // - DEISO - P1
+  // + DEISO - P2
+  mm_copy(&p->mm, &np->mm);
+  // - DEISO - P2
   release(&wait_lock);
 
   acquire(&np->lock);
   np->state = RUNNABLE;
-  // + DEISO - P1
-  acquire(&p->lock);
-  np->tickets = p->tickets;
-  release(&p->lock);
-  // - DEISO - P1
-
-  // + DEISO - P2
-  acquire(&p->lock);
-  mm_copy(&p->mm, &np->mm);
-  release(&p->lock);
-  // - DEISO - P2
-
   release(&np->lock);
 
   return pid;
@@ -479,6 +477,7 @@ wait(uint64 addr)
   }
 }
 
+#ifdef LOTERY_SCHED
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -538,6 +537,47 @@ scheduler(void)
     }
   }
 }
+#else
+
+void
+scheduler(void)
+{
+  struct proc *p;
+  struct cpu *c = mycpu();
+
+  c->proc = 0;
+  for(;;){
+    // The most recent process to run may have had interrupts
+    // turned off; enable them to avoid a deadlock if all
+    // processes are waiting.
+    intr_on();
+
+    int found = 0;
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        found = 1;
+      }
+      release(&p->lock);
+    }
+    if(found == 0) {
+      // nothing to run; stop running on this core until an interrupt.
+      intr_on();
+      asm volatile("wfi");
+    }
+  }
+}
+#endif
 
 // Switch to scheduler.  Must hold only p->lock
 // and have changed proc->state. Saves and restores

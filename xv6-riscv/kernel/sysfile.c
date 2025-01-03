@@ -536,9 +536,7 @@ sys_mmap(void)
     return -1;
   }
 
-  acquire(&myproc()->lock);
   uint64 res = (uint64)create_mapping(myproc(), len, f, prot, flags);
-  release(&myproc()->lock);
 
   return res;
 }
@@ -560,10 +558,7 @@ sys_munmap(void)
     return -1;
   }
 
-  //printf("munmap: addr: %lx, len: %d\n", addr, len);
-  acquire(&myproc()->lock);
   int res = delete_mapping(myproc(), addr, len);
-  release(&myproc()->lock);
 
   return res;
 }
