@@ -185,7 +185,7 @@ void dealloc_mapping(struct proc *p, uint64 addr, uint64 len, struct vma *vma)
         if((*pte & PTE_V) != 0){
             uint64 pa = PTE2PA(*pte);
             // Before freeing memory we must writeback the data if necesary.
-            if (vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0) {
+            if (PTE_FLAGS(*pte) & PTE_D && vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0) {
                 // Calculations to write only inside file size range (even if file is smaller than allocated pages)
                 struct inode *ip = vma->file->ip;
                 int offset = a - vma->start;

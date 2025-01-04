@@ -97,7 +97,7 @@ kfree(void *pa)
   if (r->ref != 1) {
     // assert ref == 1
     printf("kfree: assert ref == 1 failed\n");
-    printf("0x%x %d\n", r, r->ref);
+    printf("0x%p %d\n", r, r->ref);
     exit(-1);
   }
   

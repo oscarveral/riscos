@@ -142,6 +142,7 @@ UPROGS=\
 	$U/_zombie\
 	$U/_testsettickets\
 	$U/_mmaptest\
+	$U/_cowtest\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)
