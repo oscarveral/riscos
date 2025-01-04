@@ -160,22 +160,53 @@ int delete_mapping(struct proc *p, uint64 addr, uint64 len)
 
 void dealloc_mapping(struct proc *p, uint64 addr, uint64 len, struct vma *vma)
 {
-    uint64 npages = PGROUNDUP(len) / PGSIZE;
-
     if (vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable == 0) {
         panic("dealloc_mapping: bad options");
     }
 
-    if (vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0)
-    {
-        // Write back the page to the file
-        //uint64 start = PGROUNDDOWN(addr);
-
-        // Get physical address of the page
-        //uint64 pa = walkaddr(p->pagetable, start);
+    if ((addr % PGSIZE) != 0) {
+        panic("dealloc_mapping: unaligned addr");
     }
-    // TODO: Refactor this to put in this file all needed functions.
-    uvmunmap_unchecked(p->pagetable, addr, npages, 1);
+
+    uint64 a = addr;
+    uint64 npages = PGROUNDUP(len) / PGSIZE;
+    pte_t *pte = 0;
+    for (a = addr; a < addr + npages * PGSIZE; a += PGSIZE) {
+        // Basic checks.
+        if((pte = walk(p->pagetable, a, 0)) == 0)
+            panic("uvmunmap: walk");
+        if(PTE_FLAGS(*pte) == PTE_V)
+            panic("uvmunmap: not a leaf");
+        // We can only free valid pages.
+        if((*pte & PTE_V) != 0){
+            uint64 pa = PTE2PA(*pte);
+            // Before freeing memory we must writeback the data if necesary.
+            if (vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0) {
+                // Calculations to write only inside file size range (even if file is smaller than allocated pages)
+                struct inode *ip = vma->file->ip;
+                int offset = a - vma->start;
+                int n =  (ip->size - offset) < PGSIZE ? (ip->size - offset) : PGSIZE;
+                // Translated from filewrite on file.c
+                int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
+                int i = 0;
+                int r = 0;
+                while (i < n)
+                {
+                    int n1 = n - i;
+                    if(n1 > max) n1 = max;
+                    begin_op(),
+                    ilock(ip); 
+                    if ((r = writei(ip, 0, pa + i, offset, n1)) > 0) offset += r;
+                    iunlock(ip);
+                    end_op();  
+                    if(r != n1) break;
+                    i += r;            
+                }
+            }
+            kfree((void*)pa);
+        }
+        *pte = 0;
+    }
 }
 
 struct vma *find_vma(struct mm *mm, uint64 addr)
@@ -214,8 +245,12 @@ void mm_destroy(struct proc *p)
         if (mm->vmas[i].start != 0)
         {
             struct vma *vma = &mm->vmas[i];
+            // We need to release p->lock as it can cause bugs when sleeping on disk operations.
+            int has_lock = holding(&p->lock);
+            if (has_lock) release(&p->lock);
             dealloc_mapping(p, vma->start, vma->len, vma);
             fileclose(vma->file);
+            if (has_lock) acquire(&p->lock);
             vma->start = 0;
             vma->len = 0;
             vma->file = 0;

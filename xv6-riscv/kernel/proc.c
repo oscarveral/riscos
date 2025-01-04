@@ -186,10 +186,7 @@ freeproc(struct proc *p)
   // - DEISO - P1
 
   // + DEISO - P2
-  // TODO: Refactor this into the function where it fails.
-  release(&p->lock);
   mm_destroy(p);
-  acquire(&p->lock);
   // - DEISO - P2
 
   if(p->trapframe)
