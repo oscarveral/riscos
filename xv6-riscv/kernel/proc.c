@@ -185,10 +185,6 @@ freeproc(struct proc *p)
   p->ticks = 0;
   // - DEISO - P1
 
-  // + DEISO - P2
-  mm_destroy(p);
-  // - DEISO - P2
-
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
@@ -354,7 +350,7 @@ fork(void)
   np->tickets = p->tickets;
   // - DEISO - P1
   // + DEISO - P2
-  mm_copy(&p->mm, &np->mm);
+  mm_copy(p, np);
   // - DEISO - P2
   release(&wait_lock);
 
@@ -399,6 +395,10 @@ exit(int status)
       p->ofile[fd] = 0;
     }
   }
+
+  // + DEISO - P2
+  mm_destroy(p);
+  // - DEISO - P2
 
   begin_op();
   iput(p->cwd);

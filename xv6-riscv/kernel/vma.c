@@ -8,7 +8,7 @@
 #include "file.h"
 #include "fcntl.h"
 
-uint64 *create_mapping(struct proc *p, uint64 len, struct file *f, int prot, int flags)
+uint64 *create_mapping(struct proc *p, uint64 addr, uint64 len, struct file *f, int prot, int flags)
 {
     if (prot & PROT_WRITE && flags & MAP_SHARED && f->writable == 0)
     {
@@ -41,6 +41,10 @@ uint64 *create_mapping(struct proc *p, uint64 len, struct file *f, int prot, int
             cur = cur->next;
         }
         start = PGROUNDDOWN(cur->start - len);
+    }
+
+    if (addr != 0) {
+        start = PGROUNDDOWN(start);
     }
 
     vma->start = start;
@@ -198,7 +202,7 @@ void dealloc_mapping(struct proc *p, uint64 addr, uint64 len, struct vma *vma)
                     ilock(ip); 
                     if ((r = writei(ip, 0, pa + i, offset, n1)) > 0) offset += r;
                     iunlock(ip);
-                    end_op();  
+                    end_op();
                     if(r != n1) break;
                     i += r;            
                 }
@@ -244,13 +248,9 @@ void mm_destroy(struct proc *p)
     {
         if (mm->vmas[i].start != 0)
         {
-            struct vma *vma = &mm->vmas[i];
-            // We need to release p->lock as it can cause bugs when sleeping on disk operations.
-            int has_lock = holding(&p->lock);
-            if (has_lock) release(&p->lock);
+            struct vma *vma = &mm->vmas[i];      
             dealloc_mapping(p, vma->start, vma->len, vma);
             fileclose(vma->file);
-            if (has_lock) acquire(&p->lock);
             vma->start = 0;
             vma->len = 0;
             vma->file = 0;
@@ -260,11 +260,18 @@ void mm_destroy(struct proc *p)
             vma->prev = 0;
         }
     }
+    mm->first_vma = 0;
 }
 
-void mm_copy(struct mm *src, struct mm *dst)
+void mm_copy(struct proc *src, struct proc *dst)
 {
-    // TODO: Implement this function
+    struct vma *cur = src->mm.first_vma;
+    
+    if (cur == 0) return;
+    while (cur != 0) {
+        create_mapping(dst, cur->start, cur->len, cur->file, cur->prot, cur->flags);
+        cur = cur->next;
+    }
 }
 
 // - DEISO - P2

@@ -205,14 +205,14 @@ void            virtio_disk_intr(void);
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 // + DEISO - P2
-uint64 *create_mapping(struct proc *, uint64, struct file *, int, int);
+uint64 *create_mapping(struct proc *, uint64, uint64, struct file *, int, int);
 int alloc_mapping(struct proc *, uint64 addr);
 int delete_mapping(struct proc *, uint64 addr, uint64 len);
 void dealloc_mapping(struct proc *, uint64, uint64, struct vma *);
 struct vma *find_vma(struct mm *, uint64);
 void mm_init(struct proc *);
 void mm_destroy(struct proc *);
-void mm_copy(struct mm *, struct mm *);
+void mm_copy(struct proc *, struct proc *);
 // - DEISO - P2
 
 #endif // _DEFS_H_

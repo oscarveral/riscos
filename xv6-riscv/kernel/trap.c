@@ -79,7 +79,6 @@ void usertrap(void)
     uint64 fail_addr = r_stval();
     if (alloc_mapping(p, fail_addr) == -1)
     {
-      printf("usertrap(): page fault pid=%d va=0x%lx\n", p->pid, fail_addr);
       setkilled(p);
     }
   }
