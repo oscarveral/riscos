@@ -327,7 +327,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     // + DEISO - P2
-    if (*pte & PTE_W) {
+    if (*pte & PTE_W && !(*pte & PTE_NO_COW_FORCE)) {
       *pte |= PTE_COW;
       *pte &= ~(PTE_W);
     }
@@ -472,8 +472,8 @@ int copy_on_write(pagetable_t p, uint64 addr) {
   pte_t *pte = walk(p, addr, 0);
   if (pte == 0) return -1;
 
-  // Check if pte is copy on write
-  if (!(*pte & PTE_COW)) {
+  // Check if pte is copy on write and is not shared
+  if (!(*pte & PTE_COW) && (*pte & PTE_NO_COW_FORCE)) {
     return 0;
   }
   // Get the original page and references.
@@ -488,7 +488,7 @@ int copy_on_write(pagetable_t p, uint64 addr) {
     }
     // Copy original content to new page.
     memmove(mem, (char *)pa, PGSIZE);
-    // Get pte flgas, disable copy on write and enable write permission.
+    // Get pte flags, disable copy on write and enable write permission.
     uint flags = PTE_FLAGS(*pte);
     flags |= PTE_W;
     flags &= ~(PTE_COW);

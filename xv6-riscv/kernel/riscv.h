@@ -371,6 +371,7 @@ typedef uint64 *pagetable_t; // 512 PTEs
 // + DEISO - P2
 #define PTE_D (1L << 7) // Dirty bit flag
 #define PTE_COW (1L << 8) // Copy-on-write enabled flag
+#define PTE_NO_COW_FORCE (1L << 9) // Flag to force share phisical pages on write enabled shared mappings.
 // - DEISO - P2
 
 // shift a physical address to the right place for a PTE.

@@ -87,6 +87,9 @@ int alloc_mapping(struct proc *p, uint64 addr)
 
     memset(mem, 0, PGSIZE);
     uint64 user_mem = PGROUNDDOWN(addr);
+    // Set protections. If map is shared set the flag to disable cow on the resulting PTE.
+    int prots = mapping->prot | PTE_U;
+    if (mapping->flags & MAP_SHARED) prots |= PTE_NO_COW_FORCE;
     if (mappages(p->pagetable, user_mem, PGSIZE, (uint64)mem, mapping->prot | PTE_U) != 0)
     {
         //printf("alloc_mapping(): mappages failed pid=%d va=0x%lx\n", p->pid, addr);
