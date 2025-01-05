@@ -472,9 +472,13 @@ int copy_on_write(pagetable_t p, uint64 addr) {
   pte_t *pte = walk(p, addr, 0);
   if (pte == 0) return -1;
 
-  // Check if pte is copy on write and is not shared
-  if (!(*pte & PTE_COW) && (*pte & PTE_NO_COW_FORCE)) {
+  // Check if pte is copy on write
+  if (!(*pte & PTE_COW)) {
     return 0;
+  }
+  // Shared pages with copy on write must not be copied.
+  if (*pte & PTE_NO_COW_FORCE) {
+    return 1;
   }
   // Get the original page and references.
   uint64 pa = PTE2PA(*pte);
