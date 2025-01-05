@@ -76,6 +76,12 @@ void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
 
+// + DEISO - P2
+void            decref(void *pa);
+void            incref(void *pa);
+uint             getref(void *pa);
+// - DEISO - P2
+
 // log.c
 void            initlog(int, struct superblock*);
 void            log_write(struct buf*);
@@ -189,6 +195,10 @@ uint64          walkaddr(pagetable_t, uint64);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
+
+// + DEISO - P2
+int copy_on_write(pagetable_t p, uint64 addr);
+// - DEISO - P2
 
 // plic.c
 void            plicinit(void);

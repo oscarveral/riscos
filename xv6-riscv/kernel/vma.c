@@ -75,13 +75,13 @@ int alloc_mapping(struct proc *p, uint64 addr)
     struct vma *mapping = find_vma(&p->mm, addr);
     if (mapping == (struct vma *)-1)
     {
-        printf("alloc_mapping(): find_vma failed pid=%d va=0x%lx\n", p->pid, addr);
+        //printf("alloc_mapping(): find_vma failed pid=%d va=0x%lx\n", p->pid, addr);
         return -1;
     }
     uint64 *mem = kalloc();
     if (mem == 0)
     {
-        printf("alloc_mapping(): out of memory pid=%d va=0x%lx\n", p->pid, addr);
+        //printf("alloc_mapping(): out of memory pid=%d va=0x%lx\n", p->pid, addr);
         return -1;
     }
 
@@ -89,14 +89,14 @@ int alloc_mapping(struct proc *p, uint64 addr)
     uint64 user_mem = PGROUNDDOWN(addr);
     if (mappages(p->pagetable, user_mem, PGSIZE, (uint64)mem, mapping->prot | PTE_U) != 0)
     {
-        printf("alloc_mapping(): mappages failed pid=%d va=0x%lx\n", p->pid, addr);
+        //printf("alloc_mapping(): mappages failed pid=%d va=0x%lx\n", p->pid, addr);
         kfree(mem);
         return -1;
     }
 
     if (mapping->prot & PROT_WRITE && mapping->file->writable == 0)
     {
-        printf("alloc_mapping(): write to read-only file pid=%d va=0x%lx\n", p->pid, addr);
+        //printf("alloc_mapping(): write to read-only file pid=%d va=0x%lx\n", p->pid, addr);
         return -1;
     }
 
@@ -106,7 +106,7 @@ int alloc_mapping(struct proc *p, uint64 addr)
     ilock(ip);
     if (readi(ip, 0, (uint64)mem, offset, n) != n)
     {
-        printf("usertrap(): readi failed pid=%d va=0x%lx\n", p->pid, addr);
+        //printf("usertrap(): readi failed pid=%d va=0x%lx\n", p->pid, addr);
         kfree(mem);
         iunlock(ip);
         return -1;

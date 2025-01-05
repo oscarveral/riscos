@@ -73,15 +73,31 @@ void usertrap(void)
   {
     // ok
   }
-  else if (r_scause() == 13 || r_scause() == 15)
+  // + DEISO - P2
+  // Read page faults.
+  else if (r_scause() == 13)
   {
-    // TODO: Refactor this to put here all needed functions.
     uint64 fail_addr = r_stval();
     if (alloc_mapping(p, fail_addr) == -1)
     {
       setkilled(p);
     }
   }
+  // Write page faults.
+  else if (r_scause() == 15) {
+    uint64 fail_addr = r_stval();
+    int cow = copy_on_write(p->pagetable, fail_addr);
+
+    // Check if cow failed.
+    if (cow == -1) {
+      setkilled(p);
+    }
+    // If there was no cow try allocating a mapping for that address.
+    else if (cow == 0 && alloc_mapping(p, fail_addr) == -1) {
+      setkilled(p);
+    }
+  }
+  // - DEISO - P2
   else
   {
     printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);

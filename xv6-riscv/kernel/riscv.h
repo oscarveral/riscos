@@ -369,7 +369,8 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PTE_U (1L << 4) // user can access
 
 // + DEISO - P2
-#define PTE_D (1L << 7)
+#define PTE_D (1L << 7) // Dirty bit flag
+#define PTE_COW (1L << 8) // Copy-on-write enabled flag
 // - DEISO - P2
 
 // shift a physical address to the right place for a PTE.

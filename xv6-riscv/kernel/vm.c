@@ -192,7 +192,11 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
       panic("uvmunmap: not a leaf");
     if(do_free){
       uint64 pa = PTE2PA(*pte);
-      kfree((void*)pa);
+      // + DEISO - P2
+      // Check reference counting before freeing memory.
+      if (getref((void *) pa) == 1) kfree((void*)pa);
+      else decref((void *) pa);
+      // - DEISO - P2
     }
     *pte = 0;
   }
@@ -315,7 +319,6 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -323,14 +326,17 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
+    // + DEISO - P2
+    if (*pte & PTE_W) {
+      *pte |= PTE_COW;
+      *pte &= ~(PTE_W);
+    }
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    incref((void *) pa);
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
       goto err;
     }
+    // - DEISO - P2
   }
   return 0;
 
@@ -365,6 +371,12 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
     va0 = PGROUNDDOWN(dstva);
     if(va0 >= MAXVA)
       return -1;
+    // + DEISO - P2
+    // Copy on write for copyout.
+    if (copy_on_write(pagetable, va0) < 0) {
+      return -1;
+    }
+    // - DEISO - P2
     pte = walk(pagetable, va0, 0);
     if(pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 ||
        (*pte & PTE_W) == 0)
@@ -449,3 +461,49 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+// + DEISO - P2
+int copy_on_write(pagetable_t p, uint64 addr) {
+  // Check is valid address
+  addr = PGROUNDDOWN(addr);
+  if (addr >= MAXVA) return - 1;
+  
+  // Get corresponding original PTE of the pagetable.
+  pte_t *pte = walk(p, addr, 0);
+  if (pte == 0) return -1;
+
+  // Check if pte is copy on write
+  if (!(*pte & PTE_COW)) {
+    return 0;
+  }
+  // Get the original page and references.
+  uint64 pa = PTE2PA(*pte);
+  uint num_ref = getref((void *)pa);
+  // If there are multiple references to the page create a copy.
+  if (num_ref > 1) {
+    char *mem = kalloc();
+    // If there is no more memory kill the process
+    if (mem == 0) {
+      return -1;
+    }
+    // Copy original content to new page.
+    memmove(mem, (char *)pa, PGSIZE);
+    // Get pte flgas, disable copy on write and enable write permission.
+    uint flags = PTE_FLAGS(*pte);
+    flags |= PTE_W;
+    flags &= ~(PTE_COW);
+    // Remap to the address provided the new allocated page.
+    uvmunmap(p, addr, 1, 1);
+    mappages(p, addr, PGSIZE, (uint64)mem, flags);
+    return 1;
+  }
+  // If there is only one reference remaining only change flags.
+  else if (num_ref == 1) {
+    *pte |= PTE_W;
+    *pte &= ~(PTE_COW);
+    return 1;
+  }
+  // Zero page references is impossible.
+  else return -1;
+}
+// - DEISO - P2
