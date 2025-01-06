@@ -8,9 +8,13 @@
 #include "file.h"
 #include "fcntl.h"
 
-uint64 *create_mapping(struct proc *p, int use_addr, uint64 addr, uint64 len, struct file *f, int prot, int flags)
+uint64 *create_mapping(struct proc *p, int use_addr, uint64 addr, uint64 len, enum vma_type type, struct file *f, struct inode *ip, int prot, int flags)
 {
-    if (prot & PROT_WRITE && flags & MAP_SHARED && f->writable == 0)
+    if (type == FILE && prot & PROT_WRITE && flags & MAP_SHARED && f->writable == 0)
+    {
+        return (uint64 *)-1;
+    }
+    if (type == NONE || (type == FILE && f == 0) || (type == IP && ip == 0))
     {
         return (uint64 *)-1;
     }
@@ -44,14 +48,15 @@ uint64 *create_mapping(struct proc *p, int use_addr, uint64 addr, uint64 len, st
     }
 
     // Only if indicated we must use the provided address as the mapping start.
-    if (use_addr == 1) {
+    if (use_addr == 1)
+    {
         start = addr;
     }
 
     vma->start = start;
-    vma->type = FILE;
-    vma->file = f;
-    vma->ip = f->ip;
+    vma->type = type;
+    vma->file = type == FILE ? f : 0;
+    vma->ip = type == FILE ? f->ip : ip;
     vma->len = len;
     vma->prot = prot;
     vma->flags = flags;
@@ -78,13 +83,13 @@ int alloc_mapping(struct proc *p, uint64 addr)
     struct vma *mapping = find_vma(&p->mm, addr);
     if (mapping == (struct vma *)-1)
     {
-        //printf("alloc_mapping(): find_vma failed pid=%d va=0x%lx\n", p->pid, addr);
+        // printf("alloc_mapping(): find_vma failed pid=%d va=0x%lx\n", p->pid, addr);
         return -1;
     }
     uint64 *mem = kalloc();
     if (mem == 0)
     {
-        //printf("alloc_mapping(): out of memory pid=%d va=0x%lx\n", p->pid, addr);
+        // printf("alloc_mapping(): out of memory pid=%d va=0x%lx\n", p->pid, addr);
         return -1;
     }
 
@@ -92,17 +97,18 @@ int alloc_mapping(struct proc *p, uint64 addr)
     uint64 user_mem = PGROUNDDOWN(addr);
     // Set protections. If map is shared set the flag to disable cow on the resulting PTE.
     int prots = mapping->prot | PTE_U;
-    if (mapping->flags & MAP_SHARED) prots |= PTE_NO_COW_FORCE;
+    if (mapping->flags & MAP_SHARED)
+        prots |= PTE_NO_COW_FORCE;
     if (mappages(p->pagetable, user_mem, PGSIZE, (uint64)mem, mapping->prot | PTE_U) != 0)
     {
-        //printf("alloc_mapping(): mappages failed pid=%d va=0x%lx\n", p->pid, addr);
+        // printf("alloc_mapping(): mappages failed pid=%d va=0x%lx\n", p->pid, addr);
         kfree(mem);
         return -1;
     }
 
     if (mapping->prot & PROT_WRITE && mapping->file->writable == 0)
     {
-        //printf("alloc_mapping(): write to read-only file pid=%d va=0x%lx\n", p->pid, addr);
+        // printf("alloc_mapping(): write to read-only file pid=%d va=0x%lx\n", p->pid, addr);
         return -1;
     }
 
@@ -112,7 +118,7 @@ int alloc_mapping(struct proc *p, uint64 addr)
     ilock(ip);
     if (readi(ip, 0, (uint64)mem, offset, n) != n)
     {
-        //printf("usertrap(): readi failed pid=%d va=0x%lx\n", p->pid, addr);
+        // printf("usertrap(): readi failed pid=%d va=0x%lx\n", p->pid, addr);
         kfree(mem);
         iunlock(ip);
         return -1;
@@ -139,7 +145,8 @@ int delete_mapping(struct proc *p, uint64 addr, uint64 len)
 
     if (addr == vma->start && len == vma->len)
     {
-        if (vma->type == FILE) fileclose(vma->file);
+        if (vma->type == FILE)
+            fileclose(vma->file);
         if (vma->prev != 0)
             vma->prev->next = vma->next;
         if (vma->next != 0)
@@ -172,50 +179,58 @@ int delete_mapping(struct proc *p, uint64 addr, uint64 len)
 
 void dealloc_mapping(struct proc *p, uint64 addr, uint64 len, struct vma *vma)
 {
-    if (vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable == 0) {
+    if (vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable == 0)
+    {
         panic("dealloc_mapping: bad options");
     }
 
-    if ((addr % PGSIZE) != 0) {
+    if ((addr % PGSIZE) != 0)
+    {
         panic("dealloc_mapping: unaligned addr");
     }
 
     uint64 a = addr;
     uint64 npages = PGROUNDUP(len) / PGSIZE;
     pte_t *pte = 0;
-    for (a = addr; a < addr + npages * PGSIZE; a += PGSIZE) {
+    for (a = addr; a < addr + npages * PGSIZE; a += PGSIZE)
+    {
         // Basic checks.
-        if((pte = walk(p->pagetable, a, 0)) == 0)
+        if ((pte = walk(p->pagetable, a, 0)) == 0)
             panic("uvmunmap: walk");
-        if(PTE_FLAGS(*pte) == PTE_V)
+        if (PTE_FLAGS(*pte) == PTE_V)
             panic("uvmunmap: not a leaf");
         // We can only free valid pages.
-        if((*pte & PTE_V) != 0){
+        if ((*pte & PTE_V) != 0)
+        {
             uint64 pa = PTE2PA(*pte);
             // Before freeing memory we must writeback the data if necesary.
-            if (vma->type == FILE && PTE_FLAGS(*pte) & PTE_D && vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0) {
+            if (vma->type == FILE && PTE_FLAGS(*pte) & PTE_D && vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0)
+            {
                 // Calculations to write only inside file size range (even if file is smaller than allocated pages)
                 struct inode *ip = vma->ip;
                 int offset = a - vma->start;
-                int n =  (ip->size - offset) < PGSIZE ? (ip->size - offset) : PGSIZE;
+                int n = (ip->size - offset) < PGSIZE ? (ip->size - offset) : PGSIZE;
                 // Translated from filewrite on file.c
-                int max = ((MAXOPBLOCKS-1-1-2) / 2) * BSIZE;
+                int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
                 int i = 0;
                 int r = 0;
                 while (i < n)
                 {
                     int n1 = n - i;
-                    if(n1 > max) n1 = max;
+                    if (n1 > max)
+                        n1 = max;
                     begin_op(),
-                    ilock(ip); 
-                    if ((r = writei(ip, 0, pa + i, offset, n1)) > 0) offset += r;
+                        ilock(ip);
+                    if ((r = writei(ip, 0, pa + i, offset, n1)) > 0)
+                        offset += r;
                     iunlock(ip);
                     end_op();
-                    if(r != n1) break;
-                    i += r;            
+                    if (r != n1)
+                        break;
+                    i += r;
                 }
             }
-            kfree((void*)pa);
+            kfree((void *)pa);
         }
         *pte = 0;
     }
@@ -258,9 +273,10 @@ void mm_destroy(struct proc *p)
     {
         if (mm->vmas[i].start != 0)
         {
-            struct vma *vma = &mm->vmas[i];      
+            struct vma *vma = &mm->vmas[i];
             dealloc_mapping(p, vma->start, vma->len, vma);
-            if (vma->type == FILE) fileclose(vma->file);
+            if (vma->type == FILE)
+                fileclose(vma->file);
             vma->start = 0;
             vma->len = 0;
             vma->file = 0;
@@ -278,10 +294,12 @@ void mm_destroy(struct proc *p)
 void mm_copy(struct proc *src, struct proc *dst)
 {
     struct vma *cur = src->mm.first_vma;
-    
-    if (cur == 0) return;
-    while (cur != 0) {
-        create_mapping(dst, 1,cur->start, cur->len, cur->file, cur->prot, cur->flags);
+
+    if (cur == 0)
+        return;
+    while (cur != 0)
+    {
+        create_mapping(dst, 1, cur->start, cur->len, cur->type, cur->file, cur->ip, cur->prot, cur->flags);
         cur = cur->next;
     }
 }
