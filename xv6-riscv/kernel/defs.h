@@ -215,7 +215,7 @@ void            virtio_disk_intr(void);
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 // + DEISO - P2
-uint64 *create_mapping(struct proc *, uint64, uint64, struct file *, int, int);
+uint64 *create_mapping(struct proc *, int, uint64, uint64, struct file *, int, int);
 int alloc_mapping(struct proc *, uint64 addr);
 int delete_mapping(struct proc *, uint64 addr, uint64 len);
 void dealloc_mapping(struct proc *, uint64, uint64, struct vma *);

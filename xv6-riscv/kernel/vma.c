@@ -8,7 +8,7 @@
 #include "file.h"
 #include "fcntl.h"
 
-uint64 *create_mapping(struct proc *p, uint64 addr, uint64 len, struct file *f, int prot, int flags)
+uint64 *create_mapping(struct proc *p, int use_addr, uint64 addr, uint64 len, struct file *f, int prot, int flags)
 {
     if (prot & PROT_WRITE && flags & MAP_SHARED && f->writable == 0)
     {
@@ -43,8 +43,9 @@ uint64 *create_mapping(struct proc *p, uint64 addr, uint64 len, struct file *f, 
         start = PGROUNDDOWN(cur->start - len);
     }
 
-    if (addr != 0) {
-        start = PGROUNDDOWN(start);
+    // Only if indicated we must use the provided address as the mapping start.
+    if (use_addr == 1) {
+        start = addr;
     }
 
     vma->start = start;
@@ -280,7 +281,7 @@ void mm_copy(struct proc *src, struct proc *dst)
     
     if (cur == 0) return;
     while (cur != 0) {
-        create_mapping(dst, cur->start, cur->len, cur->file, cur->prot, cur->flags);
+        create_mapping(dst, 1,cur->start, cur->len, cur->file, cur->prot, cur->flags);
         cur = cur->next;
     }
 }
