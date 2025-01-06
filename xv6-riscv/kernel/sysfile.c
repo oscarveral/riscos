@@ -536,7 +536,7 @@ sys_mmap(void)
     return -1;
   }
 
-  uint64 res = (uint64)create_mapping(myproc(), 0, 0, len, FILE, f, 0, prot, flags);
+  uint64 res = (uint64)create_mapping(myproc(), 0, 0, len, FILE, f, 0, 0, prot, flags);
 
   return res;
 }

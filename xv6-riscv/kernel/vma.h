@@ -20,6 +20,7 @@ struct vma
     enum vma_type type;
     struct file *file;
     struct inode *ip;
+    uint64 off;
     int prot;
     int flags;
     struct vma *next;

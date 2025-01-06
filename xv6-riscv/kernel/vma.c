@@ -8,7 +8,7 @@
 #include "file.h"
 #include "fcntl.h"
 
-uint64 *create_mapping(struct proc *p, int use_addr, uint64 addr, uint64 len, enum vma_type type, struct file *f, struct inode *ip, int prot, int flags)
+uint64 *create_mapping(struct proc *p, int use_addr, uint64 addr, uint64 len, enum vma_type type, struct file *f, struct inode *ip, uint64 off, int prot, int flags)
 {
     if (type == FILE && prot & PROT_WRITE && flags & MAP_SHARED && f->writable == 0)
     {
@@ -50,7 +50,7 @@ uint64 *create_mapping(struct proc *p, int use_addr, uint64 addr, uint64 len, en
     // Only if indicated we must use the provided address as the mapping start.
     if (use_addr == 1)
     {
-        start = addr;
+        start = PGROUNDDOWN(addr);
     }
 
     vma->start = start;
@@ -58,6 +58,7 @@ uint64 *create_mapping(struct proc *p, int use_addr, uint64 addr, uint64 len, en
     vma->file = type == FILE ? f : 0;
     vma->ip = type == FILE ? f->ip : ip;
     vma->len = len;
+    vma->off = off;
     vma->prot = prot;
     vma->flags = flags;
     vma->next = 0;
@@ -106,14 +107,14 @@ int alloc_mapping(struct proc *p, uint64 addr)
         return -1;
     }
 
-    if (mapping->prot & PROT_WRITE && mapping->file->writable == 0)
+    if (mapping->type == FILE && mapping->prot & PROT_WRITE && mapping->file->writable == 0)
     {
         // printf("alloc_mapping(): write to read-only file pid=%d va=0x%lx\n", p->pid, addr);
         return -1;
     }
 
     struct inode *ip = mapping->ip;
-    int offset = user_mem - mapping->start;
+    int offset = (user_mem - mapping->start) + mapping->off;
     int n = (ip->size - offset) < PGSIZE ? (ip->size - offset) : PGSIZE;
     ilock(ip);
     if (readi(ip, 0, (uint64)mem, offset, n) != n)
@@ -157,6 +158,7 @@ int delete_mapping(struct proc *p, uint64 addr, uint64 len)
         vma->start = 0;
         vma->len = 0;
         vma->type = NONE;
+        vma->off = 0;
         vma->file = 0;
         vma->ip = 0;
         vma->prot = 0;
@@ -208,7 +210,7 @@ void dealloc_mapping(struct proc *p, uint64 addr, uint64 len, struct vma *vma)
             {
                 // Calculations to write only inside file size range (even if file is smaller than allocated pages)
                 struct inode *ip = vma->ip;
-                int offset = a - vma->start;
+                int offset = (a - vma->start) + vma->off;
                 int n = (ip->size - offset) < PGSIZE ? (ip->size - offset) : PGSIZE;
                 // Translated from filewrite on file.c
                 int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
@@ -259,6 +261,7 @@ void mm_init(struct proc *p)
         mm->vmas[i].type = NONE;
         mm->vmas[i].file = 0;
         mm->vmas[i].ip = 0;
+        mm->vmas[i].off = 0;
         mm->vmas[i].prot = 0;
         mm->vmas[i].flags = 0;
         mm->vmas[i].next = 0;
@@ -282,6 +285,7 @@ void mm_destroy(struct proc *p)
             vma->file = 0;
             vma->type = NONE;
             vma->ip = 0;
+            vma->off = 0;
             vma->prot = 0;
             vma->flags = 0;
             vma->next = 0;
@@ -299,7 +303,7 @@ void mm_copy(struct proc *src, struct proc *dst)
         return;
     while (cur != 0)
     {
-        create_mapping(dst, 1, cur->start, cur->len, cur->type, cur->file, cur->ip, cur->prot, cur->flags);
+        create_mapping(dst, 1, cur->start, cur->len, cur->type, cur->file, cur->ip, cur->off, cur->prot, cur->flags);
         cur = cur->next;
     }
 }
