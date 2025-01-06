@@ -7,11 +7,19 @@
 
 #define MAX_VMA 32
 
+enum vma_type {
+    NONE,
+    FILE,
+    IP,
+};
+
 struct vma
 {
     uint64 start;
     uint64 len;
+    enum vma_type type;
     struct file *file;
+    struct inode *ip;
     int prot;
     int flags;
     struct vma *next;

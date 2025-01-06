@@ -19,7 +19,7 @@ uint64 *create_mapping(struct proc *p, uint64 addr, uint64 len, struct file *f, 
     struct vma *vma = 0;
     for (int i = 0; i < MAX_VMA; i++)
     {
-        if (mm->vmas[i].start == 0)
+        if (mm->vmas[i].type == NONE)
         {
             vma = &mm->vmas[i];
             break;
@@ -48,7 +48,9 @@ uint64 *create_mapping(struct proc *p, uint64 addr, uint64 len, struct file *f, 
     }
 
     vma->start = start;
+    vma->type = FILE;
     vma->file = f;
+    vma->ip = f->ip;
     vma->len = len;
     vma->prot = prot;
     vma->flags = flags;
@@ -103,7 +105,7 @@ int alloc_mapping(struct proc *p, uint64 addr)
         return -1;
     }
 
-    struct inode *ip = mapping->file->ip;
+    struct inode *ip = mapping->ip;
     int offset = user_mem - mapping->start;
     int n = (ip->size - offset) < PGSIZE ? (ip->size - offset) : PGSIZE;
     ilock(ip);
@@ -136,7 +138,7 @@ int delete_mapping(struct proc *p, uint64 addr, uint64 len)
 
     if (addr == vma->start && len == vma->len)
     {
-        fileclose(vma->file);
+        if (vma->type == FILE) fileclose(vma->file);
         if (vma->prev != 0)
             vma->prev->next = vma->next;
         if (vma->next != 0)
@@ -146,7 +148,9 @@ int delete_mapping(struct proc *p, uint64 addr, uint64 len)
 
         vma->start = 0;
         vma->len = 0;
+        vma->type = NONE;
         vma->file = 0;
+        vma->ip = 0;
         vma->prot = 0;
         vma->flags = 0;
         vma->next = 0;
@@ -188,9 +192,9 @@ void dealloc_mapping(struct proc *p, uint64 addr, uint64 len, struct vma *vma)
         if((*pte & PTE_V) != 0){
             uint64 pa = PTE2PA(*pte);
             // Before freeing memory we must writeback the data if necesary.
-            if (PTE_FLAGS(*pte) & PTE_D && vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0) {
+            if (vma->type == FILE && PTE_FLAGS(*pte) & PTE_D && vma->prot & PROT_WRITE && vma->flags & MAP_SHARED && vma->file->writable != 0) {
                 // Calculations to write only inside file size range (even if file is smaller than allocated pages)
-                struct inode *ip = vma->file->ip;
+                struct inode *ip = vma->ip;
                 int offset = a - vma->start;
                 int n =  (ip->size - offset) < PGSIZE ? (ip->size - offset) : PGSIZE;
                 // Translated from filewrite on file.c
@@ -220,7 +224,7 @@ struct vma *find_vma(struct mm *mm, uint64 addr)
 {
     for (int i = 0; i < MAX_VMA; i++)
     {
-        if (mm->vmas[i].start <= addr && addr < mm->vmas[i].start + mm->vmas[i].len)
+        if (mm->vmas[i].type != NONE && mm->vmas[i].start <= addr && addr < mm->vmas[i].start + mm->vmas[i].len)
         {
             return &mm->vmas[i];
         }
@@ -236,7 +240,9 @@ void mm_init(struct proc *p)
     {
         mm->vmas[i].start = 0;
         mm->vmas[i].len = 0;
+        mm->vmas[i].type = NONE;
         mm->vmas[i].file = 0;
+        mm->vmas[i].ip = 0;
         mm->vmas[i].prot = 0;
         mm->vmas[i].flags = 0;
         mm->vmas[i].next = 0;
@@ -253,10 +259,12 @@ void mm_destroy(struct proc *p)
         {
             struct vma *vma = &mm->vmas[i];      
             dealloc_mapping(p, vma->start, vma->len, vma);
-            fileclose(vma->file);
+            if (vma->type == FILE) fileclose(vma->file);
             vma->start = 0;
             vma->len = 0;
             vma->file = 0;
+            vma->type = NONE;
+            vma->ip = 0;
             vma->prot = 0;
             vma->flags = 0;
             vma->next = 0;
