@@ -10,7 +10,7 @@
 enum vma_type {
     NONE,
     FILE,
-    IP,
+    PROGRAM,
 };
 
 struct vma

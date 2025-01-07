@@ -536,7 +536,7 @@ sys_mmap(void)
     return -1;
   }
 
-  uint64 res = (uint64)create_mapping(myproc(), 0, 0, len, FILE, f, 0, 0, prot, flags);
+  uint64 res = (uint64)create_vma_file(&myproc()->mm, 0, 0, len, f, 0, prot, flags);
 
   return res;
 }
@@ -558,7 +558,7 @@ sys_munmap(void)
     return -1;
   }
 
-  int res = delete_mapping(myproc(), addr, len);
+  int res = delete_vma(&myproc()->mm, myproc()->pagetable, addr, len);
 
   return res;
 }

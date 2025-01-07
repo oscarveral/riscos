@@ -327,7 +327,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     // + DEISO - P2
-    if (*pte & PTE_W && !(*pte & PTE_NO_COW_FORCE)) {
+    if (*pte & PTE_W) {
       *pte |= PTE_COW;
       *pte &= ~(PTE_W);
     }
@@ -464,6 +464,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 // + DEISO - P2
 int copy_on_write(pagetable_t p, uint64 addr) {
+  
   // Check is valid address
   addr = PGROUNDDOWN(addr);
   if (addr >= MAXVA) return - 1;
@@ -476,26 +477,32 @@ int copy_on_write(pagetable_t p, uint64 addr) {
   if (!(*pte & PTE_COW)) {
     return 0;
   }
+  
   // Shared pages with copy on write must not be copied.
-  if (*pte & PTE_NO_COW_FORCE) {
+  if (*pte & PTE_COW && *pte & PTE_SHARED) {
     return 1;
   }
+
   // Get the original page and references.
   uint64 pa = PTE2PA(*pte);
   uint num_ref = getref((void *)pa);
+ 
   // If there are multiple references to the page create a copy.
   if (num_ref > 1) {
+    // Aloc memory.
     char *mem = kalloc();
-    // If there is no more memory kill the process
     if (mem == 0) {
       return -1;
     }
+    
     // Copy original content to new page.
     memmove(mem, (char *)pa, PGSIZE);
+    
     // Get pte flags, disable copy on write and enable write permission.
     uint flags = PTE_FLAGS(*pte);
     flags |= PTE_W;
     flags &= ~(PTE_COW);
+    
     // Remap to the address provided the new allocated page.
     uvmunmap(p, addr, 1, 1);
     mappages(p, addr, PGSIZE, (uint64)mem, flags);

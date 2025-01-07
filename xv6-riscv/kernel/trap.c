@@ -78,7 +78,7 @@ void usertrap(void)
   else if (r_scause() == 13)
   {
     uint64 fail_addr = r_stval();
-    if (alloc_mapping(p, fail_addr) == -1)
+    if (alloc_vma(&p->mm, p->pagetable, fail_addr) == -1)
     {
       setkilled(p);
     }
@@ -86,14 +86,14 @@ void usertrap(void)
   // Write page faults.
   else if (r_scause() == 15) {
     uint64 fail_addr = r_stval();
-    int cow = copy_on_write(p->pagetable, fail_addr);
+    int res = copy_on_write(p->pagetable, fail_addr);
 
-    // Check if cow failed.
-    if (cow == -1) {
+    // Check if copy-on-write failed.
+    if (res == -1) {
       setkilled(p);
     }
     // If there was no cow try allocating a mapping for that address.
-    else if (cow == 0 && alloc_mapping(p, fail_addr) == -1) {
+    else if (res == 0 && alloc_vma(&p->mm, p->pagetable, fail_addr) == -1) {
       setkilled(p);
     }
   }
