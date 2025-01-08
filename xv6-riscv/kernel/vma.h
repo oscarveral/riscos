@@ -11,6 +11,7 @@ enum vma_type {
     NONE,
     FILE,
     PROGRAM,
+    STACK,
 };
 
 struct vma
@@ -20,6 +21,7 @@ struct vma
     enum vma_type type;
     struct file *file;
     struct inode *ip;
+    uint64 len_limit;
     uint64 off;
     int prot;
     int flags;

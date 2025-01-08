@@ -8,7 +8,7 @@
 #include "file.h"
 #include "fcntl.h"
 
-uint64 *create_vma_program(struct mm *mm, uint64 addr, uint64 len, struct inode *ip, uint64 off, int prot, int flags) {
+uint64 *create_vma_program(struct mm *mm, uint64 addr, uint64 len, struct inode *ip, uint64 len_limit, uint64 off, int prot, int flags) {
 
     if (ip == 0)  return (uint64 *) -1;
 
@@ -32,7 +32,49 @@ uint64 *create_vma_program(struct mm *mm, uint64 addr, uint64 len, struct inode 
     vma->file = 0;
     vma->ip = ip;
     vma->len = len;
+    vma->len_limit = len_limit;
     vma->off = off;
+    vma->prot = prot;
+    vma->flags = flags;
+    vma->next = 0;
+    vma->prev = 0;        
+
+    if (mm->first_vma == 0) mm->first_vma = vma;
+    else
+    {
+        cur->next = vma;
+        vma->prev = cur;
+    }
+
+    idup(ip);
+
+    return (uint64 *)vma->start;
+}
+
+uint64 *create_vma_stack(struct mm *mm, uint64 addr, uint64 len, int prot, int flags) {
+
+    struct vma *vma = 0;
+    for (int i = 0; i < MAX_VMA; ++i) 
+        if (mm->vmas[i].type == NONE) {
+            vma = &mm->vmas[i];
+            break;
+        }
+    if (vma == 0) return (uint64 *) -1;
+
+    struct vma *cur = mm->first_vma;
+    if (cur != 0) 
+        while (cur->next != 0)
+            cur = cur->next;
+
+    uint64 start = PGROUNDDOWN(addr);
+
+    vma->start = start;
+    vma->type = PROGRAM;
+    vma->file = 0;
+    vma->ip = 0;
+    vma->len = len;
+    vma->len_limit = len;
+    vma->off = 0;
     vma->prot = prot;
     vma->flags = flags;
     vma->next = 0;
@@ -47,6 +89,7 @@ uint64 *create_vma_program(struct mm *mm, uint64 addr, uint64 len, struct inode 
 
     return (uint64 *)vma->start;
 }
+
 
 uint64 *create_vma_file(struct mm *mm, int use_addr, uint64 addr, uint64 len, struct file *f, uint64 off, int prot, int flags) {
     
@@ -76,6 +119,7 @@ uint64 *create_vma_file(struct mm *mm, int use_addr, uint64 addr, uint64 len, st
     vma->file = f;
     vma->ip = f->ip;
     vma->len = len;
+    vma->len_limit = len;
     vma->off = off;
     vma->prot = prot;
     vma->flags = flags;
@@ -99,6 +143,8 @@ int alloc_vma(struct mm *mm, pagetable_t pagetable, uint64 addr) {
     struct vma *vma = find_vma(mm, addr);
     if (vma == (struct vma *)-1) return -1;
 
+    if (vma->type == NONE) return -1;
+
     uint64 *mem = kalloc();
     if (mem == 0) return -1;
 
@@ -114,8 +160,12 @@ int alloc_vma(struct mm *mm, pagetable_t pagetable, uint64 addr) {
         return -1;
     }
 
-    int offset = (user_mem - vma->start) + vma->off;
-    int n = (vma->ip->size - offset) < PGSIZE ? (vma->ip->size - offset) : PGSIZE;
+    if (vma->type == STACK) return 0;
+
+    int offset_pages = (user_mem - vma->start) / PGSIZE;
+    int offset = offset_pages * PGSIZE + vma->off;
+    int n = vma->len_limit - (offset_pages * PGSIZE);
+    if (n > PGSIZE) n = PGSIZE;
     ilock(vma->ip);
     if (readi(vma->ip, 0, (uint64)mem, offset, n) != n)
     {
@@ -173,7 +223,8 @@ int delete_vma(struct mm *mm, pagetable_t pagetable, uint64 addr, uint64 len) {
                     i += r;
                 }
             }
-            kfree((void *)pa);
+            if (getref((void *)pa) == 1) kfree((void *)pa);
+            else decref((void *)pa);
         }
         *pte = 0;
     }
@@ -181,6 +232,7 @@ int delete_vma(struct mm *mm, pagetable_t pagetable, uint64 addr, uint64 len) {
     if (addr == vma->start && len == vma->len)
     {
         if (vma->type == FILE) fileclose(vma->file);
+        if (vma->type == PROGRAM) iput(vma->ip);
         if (vma->prev != 0) vma->prev->next = vma->next;
         if (vma->next != 0) vma->next->prev = vma->prev;
         if (mm->first_vma == vma) mm->first_vma = vma->next;
@@ -190,6 +242,7 @@ int delete_vma(struct mm *mm, pagetable_t pagetable, uint64 addr, uint64 len) {
         vma->type = NONE;
         vma->off = 0;
         vma->file = 0;
+        vma->len_limit = 0;
         vma->ip = 0;
         vma->prot = 0;
         vma->flags = 0;
@@ -213,7 +266,10 @@ void clone_vma(struct vma* vma, struct mm *dst) {
         create_vma_file(dst, 1, vma->start, vma->len, vma->file, vma->off, vma->prot, vma->flags);
         break;
     case PROGRAM:
-        create_vma_program(dst, vma->start, vma->len, vma->ip, vma->off, vma->prot, vma->flags);
+        create_vma_program(dst, vma->start, vma->len, vma->ip, vma->len_limit, vma->off, vma->prot, vma->flags);
+        break;
+    case STACK:
+        create_vma_stack(dst, vma->start, vma->len, vma->prot, vma->flags);
         break;
     default:
         break;
@@ -245,6 +301,7 @@ void mm_init(struct proc *p)
         mm->vmas[i].file = 0;
         mm->vmas[i].ip = 0;
         mm->vmas[i].off = 0;
+        mm->vmas[i].len_limit = 0;
         mm->vmas[i].prot = 0;
         mm->vmas[i].flags = 0;
         mm->vmas[i].next = 0;
@@ -257,7 +314,7 @@ void mm_destroy(struct proc *p)
     struct mm *mm = &p->mm;
     for (int i = 0; i < MAX_VMA; i++)
     {
-        if (mm->vmas[i].start != 0)
+        if (mm->vmas[i].type != NONE)
         {
             struct vma *vma = &mm->vmas[i];
             delete_vma(&p->mm, p->pagetable, vma->start, vma->len);
