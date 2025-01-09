@@ -6,6 +6,10 @@
 #include "defs.h"
 #include "fs.h"
 
+// + DEISO - P2
+#include "proc.h"
+// - DEISO - P2
+
 /*
  * the kernel's page table.
  */
@@ -115,10 +119,12 @@ walkaddr(pagetable_t pagetable, uint64 va)
     return 0;
 
   pte = walk(pagetable, va, 0);
-  if(pte == 0)
-    return 0;
-  if((*pte & PTE_V) == 0)
-    return 0;
+  // + DEISO - P2
+  // IF kernel tries to access pages yet to be mapped it should try to allocate using the VMA.
+  if(pte == 0 || (*pte & PTE_V) == 0)
+    if (alloc_vma(&myproc()->mm, pagetable, va) < 0) 
+      return 0;
+  // - DEISO - P2
   if((*pte & PTE_U) == 0)
     return 0;
   pa = PTE2PA(*pte);
@@ -187,7 +193,11 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0)
-      panic("uvmunmap: not mapped");
+      // + DEISO - P2
+      //panic("uvmunmap: not mapped");
+      // Now ther2 can be pages that are yet to be mapped. Ignore them.
+      continue;
+      // - DEISO - P2
     if(PTE_FLAGS(*pte) == PTE_V)
       panic("uvmunmap: not a leaf");
     if(do_free){
@@ -324,7 +334,11 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
-      panic("uvmcopy: page not present");
+      // + DEISO - P2
+      //panic("uvmcopy: page not present");
+      // Ignore pages yet to be mapped.
+      continue;
+      // - DEISO - P2
     pa = PTE2PA(*pte);
     // + DEISO - P2
     if (*pte & PTE_W) {
@@ -471,7 +485,11 @@ int copy_on_write(pagetable_t p, uint64 addr) {
   
   // Get corresponding original PTE of the pagetable.
   pte_t *pte = walk(p, addr, 0);
-  if (pte == 0) return -1;
+  if (pte == 0) {
+    // If there is no pte try to retrieve the page allocating it if its possible and try again.
+    if (walkaddr(p, addr) == 0) return -1;
+    pte = walk(p, addr, 0);
+  }
 
   // Check if pte is copy on write
   if (!(*pte & PTE_COW)) {
