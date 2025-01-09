@@ -162,10 +162,11 @@ int alloc_vma(struct mm *mm, pagetable_t pagetable, uint64 addr) {
 
     if (vma->type == STACK) return 0;
 
-    int offset_pages = (user_mem - vma->start) / PGSIZE;
-    int offset = offset_pages * PGSIZE + vma->off;
-    int n = vma->len_limit - (offset_pages * PGSIZE);
-    if (n > PGSIZE) n = PGSIZE;
+    uint64 page_count_bytes = PGROUNDDOWN(addr - vma->start);
+    uint64 offset = page_count_bytes + vma->off;
+    uint64 rem = vma->len_limit - page_count_bytes;
+    uint64 n = PGSIZE >= rem ? rem : PGSIZE;
+    if (offset + n > vma->ip->size) n = vma->ip->size - offset;
     ilock(vma->ip);
     if (readi(vma->ip, 0, (uint64)mem, offset, n) != n)
     {
@@ -204,8 +205,11 @@ int delete_vma(struct mm *mm, pagetable_t pagetable, uint64 addr, uint64 len) {
                 && vma->file->writable != 0)
             {
                 struct inode *ip = vma->ip;
-                int offset = (a - vma->start) + vma->off;
-                int n = (ip->size - offset) < PGSIZE ? (ip->size - offset) : PGSIZE;
+                uint64 page_count_bytes = PGROUNDDOWN(a - vma->start);
+                uint64 offset = page_count_bytes + vma->off;
+                uint64 rem = vma->len_limit - page_count_bytes;
+                uint64 n = PGSIZE >= rem ? rem : PGSIZE;
+                if (offset + n > vma->ip->size) n = vma->ip->size - offset;
 
                 int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
                 int i = 0;

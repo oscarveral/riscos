@@ -216,8 +216,9 @@ void            virtio_disk_intr(void);
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
 // + DEISO - P2
-uint64 *create_vma_program(struct mm *, uint64, uint64, struct inode *, uint64, int, int);
+uint64 *create_vma_program(struct mm *, uint64, uint64, struct inode *,uint64 , uint64, int, int);
 uint64 *create_vma_file(struct mm *, int, uint64, uint64, struct file *, uint64, int, int);
+uint64 *create_vma_stack(struct mm*, uint64, uint64, int, int);
 int alloc_vma(struct mm *, pagetable_t, uint64);
 int delete_vma(struct mm *, pagetable_t, uint64, uint64);
 struct vma *find_vma(struct mm *, uint64);
