@@ -119,7 +119,7 @@ sys_getpinfo(void)
     return -1;
 
   getpinfo(&pstat); //Se ha rellenado pstat con los datos en el kernel
-
+  walkaddr(myproc()->pagetable, upstat);
   if(copyout(myproc()->pagetable, upstat, (char *)&pstat,sizeof(pstat)) < 0) // Copiamos la pstat desde el kernel al espacio de usuario
       return -1;
 

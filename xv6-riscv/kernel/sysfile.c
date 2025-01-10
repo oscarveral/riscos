@@ -76,6 +76,7 @@ sys_read(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  walkaddr(myproc()->pagetable, p);
   return fileread(f, p, n);
 }
 
@@ -90,7 +91,7 @@ sys_write(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
-
+  walkaddr(myproc()->pagetable, p);
   return filewrite(f, p, n);
 }
 
@@ -116,6 +117,7 @@ sys_fstat(void)
   argaddr(1, &st);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  walkaddr(myproc()->pagetable, st);
   return filestat(f, st);
 }
 
