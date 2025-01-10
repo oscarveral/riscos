@@ -74,8 +74,8 @@ void usertrap(void)
     // ok
   }
   // + DEISO - P2
-  // Read page faults.
-  else if (r_scause() == 13)
+  // Read and instruction page faults.
+  else if (r_scause() == 12 || r_scause() == 13)
   {
     uint64 fail_addr = r_stval();
     if (alloc_vma(&p->mm, p->pagetable, fail_addr) == -1)

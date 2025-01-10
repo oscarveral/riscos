@@ -7,7 +7,10 @@
 #include "defs.h"
 #include "elf.h"
 
-static int loadseg(pde_t *, uint64, struct inode *, uint, uint);
+// + DEISO - P2
+#include "fcntl.h"
+//static int loadseg(pde_t *, uint64, struct inode *, uint, uint);
+// - DEISO - P2
 
 int flags2perm(int flags)
 {
@@ -30,6 +33,10 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
+
+  // + DEISO - P2 
+  mm_destroy(p);
+  // - DEISO - P2
 
   begin_op();
 
@@ -61,12 +68,16 @@ exec(char *path, char **argv)
       goto bad;
     if(ph.vaddr % PGSIZE != 0)
       goto bad;
-    uint64 sz1;
-    if((sz1 = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz, flags2perm(ph.flags))) == 0)
-      goto bad;
-    sz = sz1;
-    if(loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0)
-      goto bad;
+    // + DEISO - P2
+    //uint64 sz1;
+    //if((sz1 = uvmalloc(pagetable, sz, ph.vaddr + ph.memsz, flags2perm(ph.flags))) == 0)
+    //  goto bad;
+    //sz = sz1;
+    //if(loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0)
+    //  goto bad;
+    create_vma_program(&p->mm, ph.vaddr, ph.memsz, ip, ph.filesz, ph.off, flags2perm(ph.flags) | PTE_R, MAP_PRIVATE);
+    sz = ph.vaddr + ph.memsz;
+    // - DEISO - P2
   }
   iunlockput(ip);
   end_op();
@@ -140,6 +151,8 @@ exec(char *path, char **argv)
   return -1;
 }
 
+/*
+// + DEISO - P2
 // Load a program segment into pagetable at virtual address va.
 // va must be page-aligned
 // and the pages from va to va+sz must already be mapped.
@@ -164,3 +177,5 @@ loadseg(pagetable_t pagetable, uint64 va, struct inode *ip, uint offset, uint sz
   
   return 0;
 }
+*/
+// - DEISO - P2

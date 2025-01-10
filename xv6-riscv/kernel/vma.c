@@ -91,8 +91,8 @@ uint64 *create_vma_stack(struct mm *mm, uint64 addr, uint64 len, int prot, int f
 }
 
 
-uint64 *create_vma_file(struct mm *mm, int use_addr, uint64 addr, uint64 len, struct file *f, uint64 off, int prot, int flags) {
-    
+uint64 *create_vma_file(struct mm *mm, uint64 len, struct file *f, uint64 off, int prot, int flags) {
+
     if (f == 0) return (uint64 *) -1;
     if (prot & PROT_WRITE && flags & MAP_SHARED && f->writable == 0) return (uint64 *) -1;
     
@@ -104,13 +104,12 @@ uint64 *create_vma_file(struct mm *mm, int use_addr, uint64 addr, uint64 len, st
         }
     if (vma == 0) return (uint64 *) -1;
 
-    uint64 start = PGROUNDDOWN(addr);
     struct vma *cur = mm->first_vma;
-    if (!use_addr) {
-        if (cur == 0) start = PGROUNDDOWN(TRAPFRAME - len);
-        else {
-            while (cur->next != 0) cur = cur->next;
-            start = PGROUNDDOWN(cur->start - len);
+    uint64 start = PGROUNDDOWN(TRAPFRAME - len);
+    if (cur != 0) {
+        while (cur->next != 0) { 
+            cur = cur->next;
+            if (cur->type == FILE) start -= PGROUNDUP(cur->len);
         }
     }
 
@@ -263,22 +262,41 @@ int delete_vma(struct mm *mm, pagetable_t pagetable, uint64 addr, uint64 len) {
     return 0;
 }
 
-void clone_vma(struct vma* vma, struct mm *dst) {
-    switch (vma->type)
-    {
-    case FILE:
-        create_vma_file(dst, 1, vma->start, vma->len, vma->file, vma->off, vma->prot, vma->flags);
-        break;
-    case PROGRAM:
-        create_vma_program(dst, vma->start, vma->len, vma->ip, vma->len_limit, vma->off, vma->prot, vma->flags);
-        break;
-    case STACK:
-        create_vma_stack(dst, vma->start, vma->len, vma->prot, vma->flags);
-        break;
-    default:
-        break;
+int clone_vma(struct vma* vma, struct mm *dst) {
+
+    struct vma *cur = 0;
+    for (int i = 0; i < MAX_VMA; ++i) 
+        if (dst->vmas[i].type == NONE) {
+            cur = &dst->vmas[i];
+            break;
+        }
+    if (cur == 0) return -1;
+
+    cur->prev = 0;
+    cur->next = 0;
+    cur->file = vma->file;
+    cur->type = vma->type;
+    cur->flags = vma->flags;
+    cur->ip = vma->ip;
+    cur->len = vma->len;
+    cur->len_limit = vma->len_limit;
+    cur->off = vma->off;
+    cur->prot = vma->prot;
+    cur->start = vma->start;
+
+    if (cur->type == FILE) filedup(cur->file);
+    if (cur->type == PROGRAM) idup(cur->ip);
+
+    struct vma *last = dst->first_vma;
+    if (last == 0) {
+        dst->first_vma = cur;
+    }
+    else while (last->next != 0) { 
+        last = last->next;
+        cur->prev = last;
     }
 
+    return 0;
 }
 
 struct vma *find_vma(struct mm *mm, uint64 addr)
