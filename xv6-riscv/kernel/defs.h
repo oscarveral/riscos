@@ -222,9 +222,9 @@ uint64 *create_vma_stack(struct mm*, uint64, uint64, int, int);
 int alloc_vma(struct mm *, pagetable_t, uint64);
 int delete_vma(struct mm *, pagetable_t, uint64, uint64);
 struct vma *find_vma(struct mm *, uint64);
-void mm_init(struct proc *);
-void mm_destroy(struct proc *);
-void mm_copy(struct proc *, struct proc *);
+void mm_init(struct mm *);
+void mm_destroy(struct mm *, pagetable_t);
+void mm_copy(struct mm *, struct mm *);
 // - DEISO - P2
 
 #endif // _DEFS_H_

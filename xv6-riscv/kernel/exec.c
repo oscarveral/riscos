@@ -34,10 +34,6 @@ exec(char *path, char **argv)
   pagetable_t pagetable = 0, oldpagetable;
   struct proc *p = myproc();
 
-  // + DEISO - P2 
-  mm_destroy(p);
-  // - DEISO - P2
-
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -55,6 +51,13 @@ exec(char *path, char **argv)
 
   if((pagetable = proc_pagetable(p)) == 0)
     goto bad;
+
+  // + DEISO - P2
+  struct mm * new = kalloc();
+  if (new == 0)
+    goto bad;
+  mm_init(new);
+  // - DEISO - P2
 
   // Load program into memory.
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
@@ -75,7 +78,7 @@ exec(char *path, char **argv)
     //sz = sz1;
     //if(loadseg(pagetable, ph.vaddr, ip, ph.off, ph.filesz) < 0)
     //  goto bad;
-    create_vma_program(&p->mm, ph.vaddr, ph.memsz, ip, ph.filesz, ph.off, flags2perm(ph.flags) | PTE_R, MAP_PRIVATE);
+    create_vma_program(new, ph.vaddr, ph.memsz, ip, ph.filesz, ph.off, flags2perm(ph.flags) | PTE_R, MAP_PRIVATE);
     sz = ph.vaddr + ph.memsz;
     // - DEISO - P2
   }
@@ -132,6 +135,13 @@ exec(char *path, char **argv)
   safestrcpy(p->name, last, sizeof(p->name));
     
   // Commit to the user image.
+
+  // + DEISO - P2 
+  mm_destroy(&p->mm, p->pagetable);
+  mm_copy(new, &p->mm);
+  kfree(new);
+  // - DEISO - P2
+
   oldpagetable = p->pagetable;
   p->pagetable = pagetable;
   p->sz = sz;
@@ -142,6 +152,12 @@ exec(char *path, char **argv)
   return argc; // this ends up in a0, the first argument to main(argc, argv)
 
  bad:
+ // + DEISO - P2
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+  if (new != 0) kfree(new);
+#pragma GCC diagnostic pop
+// - DEISO - P2
   if(pagetable)
     proc_freepagetable(pagetable, sz);
   if(ip){

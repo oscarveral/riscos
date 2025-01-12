@@ -8,10 +8,10 @@
 #define MAX_VMA 32
 
 enum vma_type {
-    NONE,
-    FILE,
-    PROGRAM,
-    STACK,
+    NONE = 0,
+    FILE = 1,
+    PROGRAM = 2,
+    STACK = 3,
 };
 
 struct vma

@@ -167,7 +167,7 @@ found:
   // - DEISO - P1
 
   // + DEISO - P2
-  mm_init(p);
+  mm_init(&p->mm);
   // - DEISO - P2
 
   return p;
@@ -332,6 +332,10 @@ fork(void)
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
 
+  // + DEISO - P2
+  mm_copy(&p->mm, &np->mm);
+  // - DEISO - P2
+
   // increment reference counts on open file descriptors.
   for(i = 0; i < NOFILE; i++)
     if(p->ofile[i])
@@ -349,9 +353,6 @@ fork(void)
   // + DEISO - P1
   np->tickets = p->tickets;
   // - DEISO - P1
-  // + DEISO - P2
-  mm_copy(p, np);
-  // - DEISO - P2
   release(&wait_lock);
 
   acquire(&np->lock);
@@ -397,7 +398,7 @@ exit(int status)
   }
 
   // + DEISO - P2
-  mm_destroy(p);
+  mm_destroy(&p->mm, p->pagetable);
   // - DEISO - P2
 
   begin_op();

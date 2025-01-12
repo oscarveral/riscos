@@ -2827,6 +2827,45 @@ execout(char *s)
   exit(0);
 }
 
+// + DEISO - P2
+// test the exec() code that cleans up if it runs out
+// of memory. it's really a test that such a condition
+// doesn't cause a panic.
+void
+execout_extended(char *s)
+{
+  for(int avail = 0; avail < 16; avail++){
+    int pid = fork();
+    if(pid < 0){
+      printf("fork failed\n");
+      exit(1);
+    } else if(pid == 0){
+      // allocate all of memory.
+      while(1){
+        uint64 a = (uint64) sbrk(4096);
+        if(a == 0xffffffffffffffffLL)
+          break;
+        *(char*)(a + 4096 - 1) = 1;
+      }
+
+      // free a few pages, in order to let exec() make some
+      // progress.
+      for(int i = 0; i < avail; i++)
+        sbrk(-4096);
+      
+      close(1);
+      char *args[] = { "echo", "x", 0 };
+      exec("echo", args);
+      exit(0);
+    } else {
+      wait((int*)0);
+    }
+  }
+
+  exit(0);
+}
+// - DEISO - P2
+
 // can the kernel tolerate running out of disk space?
 void
 diskfull(char *s)
@@ -2944,6 +2983,9 @@ struct test slowtests[] = {
   {manywrites, "manywrites"},
   {badwrite, "badwrite" },
   {execout, "execout"},
+  // + DEISO - P2
+  {execout_extended, "execout_extended"},
+  // - DEISO - P2
   {diskfull, "diskfull"},
   {outofinodes, "outofinodes"},
     

@@ -5,7 +5,7 @@ run-nox:
 	docker run -it --rm \
 		-h deiso \
 		-v /tmp:/tmp/tmp:rw \
-		-v /home/oscar/Escritorio/riscos:/root/riscos:rw --name deiso debian/deiso:r2
+		-v /home/oscar/deiso:/root/deiso:rw --name deiso debian/deiso:r2
 
 run:
 	xhost +local:root
@@ -16,7 +16,7 @@ run:
 		--cap-add=SYS_PTRACE \
 		-v /tmp/.X11-unix:/tmp/.X11-unix:rw \
 		-v /tmp:/tmp/tmp:rw \
-		-v /home/oscar/Escritorio/riscos/xv6-riscv:/root/deiso:rw --name deiso debian/deiso:r2
+		-v /home/oscar/deiso/xv6-riscv:/root/deiso:rw --name deiso debian/deiso:r2
 
 run-gdb:
 	docker exec -it deiso bash

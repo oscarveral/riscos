@@ -167,7 +167,10 @@ mappages(pagetable_t pagetable, uint64 va, uint64 size, uint64 pa, int perm)
     if((pte = walk(pagetable, a, 1)) == 0)
       return -1;
     if(*pte & PTE_V)
-      panic("mappages: remap");
+      // + DEISO - P2
+      //panic("mappages: remap");
+      return -1;
+      // - DEISO - P2
     *pte = PA2PTE(pa) | perm | PTE_V;
     if(a == last)
       break;
@@ -191,11 +194,14 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
 
   for(a = va; a < va + npages*PGSIZE; a += PGSIZE){
     if((pte = walk(pagetable, a, 0)) == 0)
-      panic("uvmunmap: walk");
+      // + DEISO - P2
+      //panic("uvmunmap: walk");
+      continue;
+      // - DEISO - P2
     if((*pte & PTE_V) == 0)
       // + DEISO - P2
       //panic("uvmunmap: not mapped");
-      // Now ther2 can be pages that are yet to be mapped. Ignore them.
+      // Now there can be pages that are yet to be mapped. Ignore them.
       continue;
       // - DEISO - P2
     if(PTE_FLAGS(*pte) == PTE_V)
