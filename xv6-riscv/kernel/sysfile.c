@@ -76,7 +76,9 @@ sys_read(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  // + DEISO - P2
   walkaddr(myproc()->pagetable, p);
+  // - DEISO - P2
   return fileread(f, p, n);
 }
 
@@ -91,7 +93,9 @@ sys_write(void)
   argint(2, &n);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  // + DEISO - P2
   walkaddr(myproc()->pagetable, p);
+  // - DEISO - P2
   return filewrite(f, p, n);
 }
 
@@ -117,7 +121,9 @@ sys_fstat(void)
   argaddr(1, &st);
   if(argfd(0, 0, &f) < 0)
     return -1;
+  // + DEISO - P2
   walkaddr(myproc()->pagetable, st);
+  // - DEISO - P2
   return filestat(f, st);
 }
 
