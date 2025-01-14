@@ -528,7 +528,12 @@ int copy_on_write(pagetable_t p, uint64 addr) {
     
     // Remap to the address provided the new allocated page.
     uvmunmap(p, addr, 1, 1);
-    mappages(p, addr, PGSIZE, (uint64)mem, flags);
+    if (mappages(p, addr, PGSIZE, (uint64)mem, flags) < 0)
+	{
+		kfree(mem);
+		return -1;
+	}
+	
     return 1;
   }
   // If there is only one reference remaining only change flags.
