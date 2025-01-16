@@ -7,7 +7,6 @@ Modificación de xv6 implementando las siguientes mejoras:
 * Páginas físicas compartidas entre procesos padre e hijo en mapeos de memoria compartidos.
 * Reserva de páginas físicas bajo demanada en los mapeos de memoria.
 * Ejecución de binarios con paginación bajo demanda.
-* Soporte para Device Tree.
 
 ## Autores.
 * Beatriz Pérez Garnica.

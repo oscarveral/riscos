@@ -490,6 +490,7 @@ scheduler(void)
   struct cpu *c = mycpu();
 
   c->proc = 0;
+  int rand_seed = SEMILLA;
   for(;;){
     // The most recent process to run may have had interrupts
     // turned off; enable them to avoid a deadlock if all
@@ -507,24 +508,41 @@ scheduler(void)
       }
       release(&p->lock);
     }
-    int rand_seed = SEMILLA;
     rand_seed = (rand_seed * MULTIPLICADOR + INCREMENTO) % MODULO;
     int winning_ticket = rand_seed % total_tickets;
-    int suma_tickets = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
+	if (winning_ticket < 0) {
+		winning_ticket = winning_ticket * -1;
+	}
+	int suma_tickets = 0;
+	int winner_found = 0;
+	struct proc *winner;
+	p = proc;
+    while((p < &proc[NPROC]) && (winner_found == 0)){
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
         suma_tickets += p->tickets;
-        if(suma_tickets > winning_ticket) {
-          p->ticks++;
-          p->state = RUNNING;
-          c->proc = p;
-          swtch(&c->context, &p->context);
-          c->proc = 0;
-          found = 1;
+        // Se encuentra el proceso ganador
+        if(suma_tickets > winning_ticket){
+          winner = p;
+          winner_found = 1;
         }
       }
       release(&p->lock);
+      p++;
+    }
+    if(winner_found == 1){
+      acquire(&winner->lock);
+
+      winner->ticks++;
+
+      winner->state = RUNNING;
+      c->proc = winner;
+      swtch(&c->context, &winner->context);
+
+      c->proc = 0;
+      found = 1;
+
+      release(&winner->lock);
     }
     // - DEISO - P1
 
